@@ -1,0 +1,12 @@
+{
+  "name": "tl-cli",
+  "version": "0.1.0",
+  "description": "ThoughtLeaders CLI — query sponsorship deals, channels, brands, uploads, and intelligence from the terminal",
+  "author": {
+    "name": "ThoughtLeaders",
+    "email": "dev@thoughtleaders.io"
+  },
+  "homepage": "https://docs.thoughtleaders.io/cli",
+  "repository": "https://github.com/ThoughtLeaders-io/tl-cli",
+  "keywords": ["thoughtleaders", "sponsorship", "influencer", "data", "cli"]
+}
