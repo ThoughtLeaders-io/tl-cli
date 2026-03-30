@@ -1,8 +1,7 @@
-"""Auth0 PKCE login flow with localhost callback server."""
+"""Auth0 login flows: browser-based PKCE and headless device code."""
 
 import http.server
 import secrets
-import sys
 import threading
 import time
 import urllib.parse
@@ -28,8 +27,8 @@ class _CallbackResult:
     state: str | None = None
 
 
-def login() -> StoredTokens:
-    """Run the full Auth0 PKCE login flow.
+def login_browser() -> StoredTokens:
+    """Run the Auth0 PKCE login flow with a local browser.
 
     1. Generate PKCE pair + state
     2. Start localhost callback server
@@ -92,6 +91,96 @@ def login() -> StoredTokens:
     save_tokens(tokens)
     console.print(f"[green]Logged in as {tokens.email or 'unknown'}[/green]")
     return tokens
+
+
+def login_device_code() -> StoredTokens:
+    """Run the Auth0 Device Authorization Flow (RFC 8628).
+
+    Works on headless machines — the user authenticates via any browser on any device.
+    """
+    config = get_config()
+
+    # Request a device code
+    response = httpx.post(
+        f"https://{config.auth0_domain}/oauth/device/code",
+        data={
+            "client_id": config.auth0_client_id,
+            "scope": "openid profile email offline_access",
+            "audience": config.auth0_audience,
+        },
+    )
+
+    if response.status_code != 200:
+        console.print(f"[red]Failed to start device login: {response.text}[/red]")
+        raise SystemExit(1)
+
+    data = response.json()
+    device_code = data["device_code"]
+    user_code = data["user_code"]
+    verification_uri = data["verification_uri"]
+    verification_uri_complete = data.get("verification_uri_complete", verification_uri)
+    interval = data.get("interval", 5)
+    expires_in = data.get("expires_in", 900)
+
+    console.print()
+    console.print("[bold]To log in, open this URL on any device:[/bold]")
+    console.print(f"  {verification_uri_complete}")
+    console.print()
+    console.print(f"[bold]And enter the code:[/bold]  [cyan bold]{user_code}[/cyan bold]")
+    console.print()
+    console.print(f"[dim]The code expires in {expires_in // 60} minutes.[/dim]")
+
+    # Poll for token
+    deadline = time.time() + expires_in
+    while time.time() < deadline:
+        time.sleep(interval)
+
+        token_response = httpx.post(
+            f"https://{config.auth0_domain}/oauth/token",
+            data={
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                "device_code": device_code,
+                "client_id": config.auth0_client_id,
+            },
+        )
+
+        token_data = token_response.json()
+
+        if token_response.status_code == 200:
+            # Extract email from ID token if present
+            email = None
+            id_token = token_data.get("id_token")
+            if id_token:
+                email = _extract_email_from_jwt(id_token)
+
+            tokens = StoredTokens(
+                access_token=token_data["access_token"],
+                refresh_token=token_data.get("refresh_token"),
+                expires_at=time.time() + token_data.get("expires_in", 3600),
+                email=email,
+            )
+            save_tokens(tokens)
+            console.print(f"\n[green]Logged in as {tokens.email or 'unknown'}[/green]")
+            return tokens
+
+        error = token_data.get("error")
+        if error == "authorization_pending":
+            continue
+        elif error == "slow_down":
+            interval += 5
+            continue
+        elif error == "expired_token":
+            console.print("[red]Device code expired. Please try again.[/red]")
+            raise SystemExit(1)
+        elif error == "access_denied":
+            console.print("[red]Login was denied.[/red]")
+            raise SystemExit(1)
+        else:
+            console.print(f"[red]Login failed: {token_data.get('error_description', error)}[/red]")
+            raise SystemExit(1)
+
+    console.print("[red]Login timed out. Please try again.[/red]")
+    raise SystemExit(1)
 
 
 def refresh_access_token(refresh_token: str) -> StoredTokens:
