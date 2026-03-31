@@ -34,7 +34,7 @@ Ruff config: Python 3.10 target, 100-char line length.
 
 ### Entry Point & Command Registration
 
-`src/tl_cli/main.py` creates the root Typer app and registers all subcommands via `app.add_typer()`. The console script `tl` maps to `tl_cli.main:app`.
+`src/tl_cli/main.py` creates the root Typer app and registers all subcommands via `app.add_typer()`. The console script `tl` maps to `tl_cli.main:cli`, which wraps the Typer app with top-level error handling (respects `--debug`).
 
 ### Command Pattern (all data commands follow this)
 
@@ -61,6 +61,8 @@ When adding a new command, copy an existing one (e.g., `deals.py`) and follow th
 ### HTTP Client (`client/http.py`)
 
 `TLClient` wraps httpx with auth header injection and automatic token refresh on 401. All API calls go through `_request()`.
+
+Every request includes an `X-TL-Client: cli/<version>` header. This header is used server-side in a Cloudflare WAF rule to skip managed challenges (JS/CAPTCHA) for CLI traffic on `/api/cli/*` paths. The header is not a secret — Cloudflare bypass is safe because the API enforces its own auth via Bearer tokens. If Cloudflare starts blocking CLI requests again, verify the WAF rule matches the current header value.
 
 ### Error Handling (`client/errors.py`)
 

@@ -5,12 +5,15 @@ Query sponsorship data, channels, brands, and intelligence.
 
 import json
 import sys
+import traceback
 from typing import Optional
 
 import click
 import typer
+from rich.console import Console
 
 from tl_cli import __version__
+from tl_cli import config as tl_config
 from tl_cli.auth.commands import app as auth_app
 from tl_cli.commands.ask import app as ask_app
 from tl_cli.commands.balance import app as balance_app
@@ -45,8 +48,12 @@ def main(
         False, "--version", "-v", callback=version_callback, is_eager=True,
         help="Show version",
     ),
+    debug: bool = typer.Option(
+        False, "--debug", help="Show detailed error information",
+    ),
 ) -> None:
     """ThoughtLeaders CLI."""
+    tl_config.debug = debug
 
 
 # System
@@ -95,5 +102,20 @@ def help_command(
     raise typer.Exit()
 
 
+def cli() -> None:
+    """Entry point that wraps the Typer app with top-level error handling."""
+    try:
+        app()
+    except SystemExit:
+        raise
+    except Exception as exc:
+        if tl_config.debug:
+            traceback.print_exc(file=sys.stderr)
+        else:
+            Console(stderr=True).print(f"[red]Error:[/red] {exc}")
+            Console(stderr=True).print("[dim]Run with --debug for details.[/dim]")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    app()
+    cli()

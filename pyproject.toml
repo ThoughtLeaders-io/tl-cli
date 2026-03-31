@@ -33,7 +33,7 @@ dependencies = [
 ]
 
 [project.scripts]
-tl = "tl_cli.main:app"
+tl = "tl_cli.main:cli"
 
 [project.urls]
 Homepage = "https://thoughtleaders.io"

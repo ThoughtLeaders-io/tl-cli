@@ -2,6 +2,7 @@
 
 import httpx
 
+from tl_cli import __version__
 from tl_cli.auth.login import refresh_access_token
 from tl_cli.auth.token_store import load_tokens
 from tl_cli.client.errors import ApiError
@@ -16,7 +17,10 @@ class TLClient:
         self._client = httpx.Client(
             base_url=self._config.cli_api_base,
             timeout=30.0,
-            headers={"User-Agent": "tl-cli/0.1.0"},
+            headers={
+                "User-Agent": f"tl-cli/{__version__}",
+                "X-TL-Client": f"cli/{__version__}",
+            },
         )
 
     def get(self, path: str, params: dict | None = None) -> dict:
@@ -48,7 +52,11 @@ class TLClient:
 
         if response.status_code >= 400:
             detail = self._extract_detail(response)
-            raise ApiError(response.status_code, detail, raw=response.json() if response.text else None)
+            try:
+                raw = response.json() if response.text else None
+            except Exception:
+                raw = None
+            raise ApiError(response.status_code, detail, raw=raw, url=str(response.url))
 
         return response.json()
 
@@ -84,7 +92,10 @@ class TLClient:
             data = response.json()
             return data.get("detail", data.get("error", str(data)))
         except Exception:
-            return response.text or f"HTTP {response.status_code}"
+            text = response.text or ""
+            if text.lstrip().startswith("<!") or text.lstrip().startswith("<html"):
+                return f"HTTP {response.status_code} (non-JSON response from server)"
+            return text or f"HTTP {response.status_code}"
 
     def close(self) -> None:
         self._client.close()
