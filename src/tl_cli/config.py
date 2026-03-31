@@ -8,7 +8,7 @@ from pathlib import Path
 DEFAULT_API_URL = "https://app.thoughtleaders.io"
 
 # Auth0 defaults (CLI-specific application)
-DEFAULT_AUTH0_DOMAIN = "thoughtleaders.us.auth0.com"
+DEFAULT_AUTH0_DOMAIN = "dev-mq73b7zhdhwvgae1.us.auth0.com"
 DEFAULT_AUTH0_CLIENT_ID = "BWTaMBWRP0wxWjPXbSa9FHhbz7RKfURu" # Set when Auth0 app is created, not secret
 DEFAULT_AUTH0_AUDIENCE = "https://app.thoughtleaders.io/mcp" # No relation to the MCP API, just uses the same OAuth0 "audience" config
 
