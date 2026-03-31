@@ -12,11 +12,12 @@ err = Console(stderr=True)
 class ApiError(Exception):
     """Raised when the API returns a non-success status."""
 
-    def __init__(self, status_code: int, detail: str, raw: dict | None = None, url: str | None = None):
+    def __init__(self, status_code: int, detail: str, raw: dict | None = None, url: str | None = None, response_text: str | None = None):
         self.status_code = status_code
         self.detail = detail
         self.raw = raw
         self.url = url
+        self.response_text = response_text
         super().__init__(f"HTTP {status_code}: {detail}")
 
 
@@ -30,9 +31,9 @@ def _print_debug(error: ApiError) -> None:
     if error.url:
         err.print(f"[dim]URL: {error.url}[/dim]")
     err.print(f"[dim]HTTP {error.status_code}: {error.detail}[/dim]")
-    if error.raw:
+    if error.response_text:
         err.print(f"[dim]Response body:[/dim]")
-        err.print(f"[dim]{json.dumps(error.raw, indent=2)}[/dim]")
+        err.print(f"[dim]{error.response_text}[/dim]")
     err.print(f"[dim]Traceback:[/dim]")
     err.print(f"[dim]{''.join(traceback.format_exception(error))}[/dim]")
 

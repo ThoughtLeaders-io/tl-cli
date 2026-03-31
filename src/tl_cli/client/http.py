@@ -56,7 +56,10 @@ class TLClient:
                 raw = response.json() if response.text else None
             except Exception:
                 raw = None
-            raise ApiError(response.status_code, detail, raw=raw, url=str(response.url))
+            raise ApiError(
+                response.status_code, detail, raw=raw,
+                url=str(response.url), response_text=response.text,
+            )
 
         return response.json()
 
