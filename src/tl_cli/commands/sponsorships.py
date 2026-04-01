@@ -10,7 +10,7 @@ from tl_cli.client.http import get_client
 from tl_cli.filters import split_id_and_filters
 from tl_cli.output.formatter import detect_format, output, output_single
 
-COLUMNS = ["id", "brand", "channel", "status", "price", "send_date", "owner"]
+COLUMNS = ["id", "brand_id", "brand", "channel_id", "channel", "status", "price", "send_date", "owner", "owner_email"]
 COLUMN_CONFIG = {"price": {"justify": "right"}}
 
 
