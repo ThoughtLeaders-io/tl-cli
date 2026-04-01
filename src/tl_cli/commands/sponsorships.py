@@ -11,6 +11,24 @@ from tl_cli.filters import split_id_and_filters
 from tl_cli.output.formatter import detect_format, output, output_single
 
 COLUMNS = ["id", "brand", "channel", "status", "price", "send_date", "owner"]
+COLUMN_CONFIG = {"price": {"justify": "right"}}
+
+
+def _format_results(results: list[dict]) -> list[dict]:
+    """Clean up sponsorship results for display."""
+    for row in results:
+        # send_date: strip time portion, keep date only
+        sd = row.get("send_date")
+        if sd and isinstance(sd, str) and "T" in sd:
+            row["send_date"] = sd[:10]
+        # price: no decimal places
+        price = row.get("price")
+        if price is not None:
+            try:
+                row["price"] = str(int(float(price)))
+            except (ValueError, TypeError):
+                pass
+    return results
 
 
 def list_or_show(
@@ -43,7 +61,9 @@ def list_or_show(
         else:
             params = {**filters, "limit": str(limit), "offset": str(offset)}
             data = client.get("/sponsorships", params=params)
-            output(data, fmt, columns=COLUMNS, title=title)
+            if "results" in data:
+                data["results"] = _format_results(data["results"])
+            output(data, fmt, columns=COLUMNS, title=title, column_config=COLUMN_CONFIG)
     except ApiError as e:
         handle_api_error(e)
     finally:
