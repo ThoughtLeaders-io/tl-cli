@@ -31,7 +31,7 @@ Customer's machine                    TL Infrastructure
 
 | Command | Description |
 |---------|-------------|
-| `tl sponsorships [filters...]` | List sponsorships (adlink + adspot + channel + brand) |
+| `tl sponsorships [filters...]` | List sponsorships (join adlink + adspot + channel + brand) |
 | `tl sponsorships <id>` | Show sponsorship detail |
 | `tl sponsorships create --channel <id> --brand <id>` | Create a proposal (free, no credits) |
 | `tl deals [filters...]` | Shortcut: agreed-upon sponsorships (`status:deal`) |

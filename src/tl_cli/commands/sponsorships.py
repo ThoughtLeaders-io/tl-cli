@@ -50,6 +50,48 @@ def list_or_show(
         client.close()
 
 
+def create_sponsorship(args: list[str], status: str | None = None) -> None:
+    """Shared create logic. Parses --channel, --brand, --price, --json, --quiet from args."""
+    import click
+
+    # Minimal arg parsing for create subcommand
+    parser = click.OptionParser()
+    parser.add_option(click.Option(["--channel", "-c"], type=int, required=True))
+    parser.add_option(click.Option(["--brand", "-b"], type=int, required=True))
+    parser.add_option(click.Option(["--price", "-p"], type=float, required=False))
+    parser.add_option(click.Option(["--json"], is_flag=True, flag_value=True, default=False))
+    parser.add_option(click.Option(["--quiet", "-q"], is_flag=True, flag_value=True, default=False))
+    try:
+        opts, _, _ = parser.parse_args(args)
+    except click.UsageError as e:
+        Console(stderr=True).print(f"[red]Error:[/red] {e}")
+        Console(stderr=True).print("Usage: tl <command> create --channel <id> --brand <id> [--price <amount>] [--json] [--quiet]")
+        raise typer.Exit(1)
+
+    channel = opts.get("channel")
+    brand = opts.get("brand")
+    if not channel or not brand:
+        Console(stderr=True).print("[red]Error:[/red] --channel and --brand are required.")
+        raise typer.Exit(1)
+
+    fmt = detect_format(opts.get("json", False), False, False, opts.get("quiet", False))
+    body: dict = {"channel_id": channel, "brand_id": brand}
+    price = opts.get("price")
+    if price is not None:
+        body["price"] = price
+    if status is not None:
+        body["status"] = status
+
+    client = get_client()
+    try:
+        data = client.post("/sponsorships", json_body=body)
+        output_single(data, fmt)
+    except ApiError as e:
+        handle_api_error(e)
+    finally:
+        client.close()
+
+
 app = typer.Typer(help="Sponsorships (deals, matches, proposals)")
 
 
@@ -70,33 +112,15 @@ def sponsorships(
         tl sponsorships                              # List recent sponsorships
         tl sponsorships 12345                        # Show sponsorship #12345
         tl sponsorships status:sold brand:"Nike"     # Filter sponsorships
+        tl sponsorships create --channel 1 --brand 2 # Create a proposal
     """
     if ctx.invoked_subcommand is not None:
         return
 
+    args = args or []
+    if args and args[0] == "create":
+        create_sponsorship(args[1:], status="proposed")
+        return
+
     fmt = detect_format(json_output, csv_output, md_output, quiet)
-    list_or_show(args or [], fmt, limit, offset)
-
-
-@app.command("create")
-def create(
-    channel: int = typer.Option(..., "--channel", "-c", help="Channel ID"),
-    brand: int = typer.Option(..., "--brand", "-b", help="Brand ID"),
-    price: Optional[float] = typer.Option(None, "--price", "-p", help="Deal price"),
-    json_output: bool = typer.Option(False, "--json", help="JSON output"),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Raw JSON only"),
-) -> None:
-    """Create a new sponsorship proposal (free, no credits charged)."""
-    fmt = detect_format(json_output, False, False, quiet)
-    body = {"channel_id": channel, "brand_id": brand}
-    if price is not None:
-        body["price"] = price
-
-    client = get_client()
-    try:
-        data = client.post("/sponsorships", json_body=body)
-        output_single(data, fmt)
-    except ApiError as e:
-        handle_api_error(e)
-    finally:
-        client.close()
+    list_or_show(args, fmt, limit, offset)
