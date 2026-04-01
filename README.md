@@ -39,6 +39,9 @@ tl deals since:today                      # Deals from today (date keywords: tod
 tl matches                                # Possible brand-channel pairings
 tl proposals                              # Matches proposed to both sides
 
+# Search videos (note: this only shows "your" videos)
+ tl uploads --csv q:code
+
 # Search channels
 tl channels category:cooking min-subs:100k
 
@@ -75,6 +78,7 @@ ThoughtLeaders has its internal terminology that's exposed throughout this tool.
     * *Deals* - Contractually agreed-upon sponsorships. AKA sold sponsorships. They can be either in a production pipeline or already published / live.
     * *Matches* - Possible matches between brands and channels, i.e. all pairings that ThoughtLeaders thinks could possibly be right for each other.
     * *Proposals* - Matches that are actually proposed to both sides to consider.
+* **Send date** - The expected publication date for a sponsored video
 
 Sponsorships are the centre of attention in ThoughtLeaders - all other analytics and operations serve to produce or optimise sponsorships.
 Note that the term "Sponsorship" is wide, and can encompass deals that yet need to be approved by either side. There is a funnel of
