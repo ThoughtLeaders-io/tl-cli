@@ -66,9 +66,21 @@ def describe(
         client.close()
 
 
+def _credit_str(credits: dict, key: str) -> str:
+    value = credits.get(key, "free")
+    is_free = value == 0 or value == "free"
+    if is_free and credits.get("credits_vary"):
+        return "*"
+    assert not credits.get("credits_vary"), \
+        f"credits_vary must not be set alongside a fixed non-zero rate ({key}={value})"
+    return str(value)
+
+
 def _print_resource_list(data: dict) -> None:
     """Print all available resources."""
     resources = data.get("resources", [])
+    has_variable = any(r.get("credits", {}).get("credits_vary") for r in resources)
+
     table = Table(title="Available Resources")
     table.add_column("Resource", style="bold cyan")
     table.add_column("Description")
@@ -80,11 +92,13 @@ def _print_resource_list(data: dict) -> None:
         table.add_row(
             r["name"],
             r.get("description", ""),
-            str(credits.get("list", "free")),
-            str(credits.get("detail", "free")),
+            _credit_str(credits, "list"),
+            _credit_str(credits, "detail"),
         )
 
     console.print(table)
+    if has_variable:
+        console.print("[dim]* Variable pricing depending on the complexity of the report.[/dim]")
 
 
 def _print_resource_detail(data: dict, filters_only: bool, fields_only: bool) -> None:
