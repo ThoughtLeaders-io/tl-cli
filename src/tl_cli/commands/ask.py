@@ -32,7 +32,7 @@ def ask(
     Credits: result credits + 2/result surcharge (waived with --llm-key).
 
     Examples:
-        tl ask "show me all sold deals for Nike in Q1"
+        tl ask "show me all sold sponsorships for Nike in Q1"
         tl ask "which channels had the most views last month" --llm-key sk-...
     """
     if ctx.invoked_subcommand is not None:

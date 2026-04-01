@@ -37,6 +37,7 @@ def output(
     fmt: str,
     columns: list[str] | None = None,
     title: str | None = None,
+    column_config: dict[str, dict] | None = None,
 ) -> None:
     """Format and print API response data.
 
@@ -73,7 +74,7 @@ def output(
     elif fmt == "md":
         _output_markdown(results, columns)
     else:
-        _output_table(results, columns, title, total)
+        _output_table(results, columns, title, total, column_config)
 
     _print_usage(usage)
     _print_breadcrumbs(breadcrumbs)
@@ -112,17 +113,27 @@ def _auto_columns(results: list[dict]) -> list[str]:
 
 
 def _output_table(
-    results: list[dict], columns: list[str], title: str | None, total: int | None
+    results: list[dict],
+    columns: list[str],
+    title: str | None,
+    total: int | None,
+    column_config: dict[str, dict] | None = None,
 ) -> None:
-    """Rich table output for TTY."""
+    """Rich table output for TTY.
+
+    column_config maps column names to kwargs passed to table.add_column(),
+    e.g. {"price": {"justify": "right"}}.
+    """
     console = Console()
+    column_config = column_config or {}
     header = title or "Results"
     if total is not None:
         header += f" ({len(results)} of {total})"
 
     table = Table(title=header, show_lines=False)
     for col in columns:
-        table.add_column(col, overflow="ellipsis", max_width=40)
+        extra = column_config.get(col, {})
+        table.add_column(col, overflow="ellipsis", max_width=40, **extra)
 
     for row in results:
         table.add_row(*[_truncate(str(row.get(col, "")), 40) for col in columns])
