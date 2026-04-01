@@ -14,7 +14,7 @@ app = typer.Typer(help="Video uploads (YouTube content from Elasticsearch)")
 def uploads(ctx: typer.Context) -> None:
     """Video uploads from YouTube (Elasticsearch)."""
     if ctx.invoked_subcommand is None:
-        ctx.invoke(list_cmd, args=[])
+        ctx.invoke(list_cmd, args=[], json_output=False, csv_output=False, md_output=False, quiet=False, limit=50, offset=0)
 
 
 @app.command("list")

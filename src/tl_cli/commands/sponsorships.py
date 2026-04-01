@@ -109,7 +109,7 @@ app = typer.Typer(help="Sponsorships (deals, matches, proposals)")
 def sponsorships(ctx: typer.Context) -> None:
     """Sponsorships — the centre of attention in ThoughtLeaders."""
     if ctx.invoked_subcommand is None:
-        ctx.invoke(list_cmd, args=[])
+        ctx.invoke(list_cmd, args=[], json_output=False, csv_output=False, md_output=False, quiet=False, limit=50, offset=0)
 
 
 @app.command("list")

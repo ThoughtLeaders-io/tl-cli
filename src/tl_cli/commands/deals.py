@@ -14,7 +14,7 @@ app = typer.Typer(help="Deals — agreed-upon sponsorships (shortcut for sponsor
 def deals(ctx: typer.Context) -> None:
     """Deals — contractually agreed-upon sponsorships."""
     if ctx.invoked_subcommand is None:
-        ctx.invoke(list_cmd, args=[])
+        ctx.invoke(list_cmd, args=[], json_output=False, csv_output=False, md_output=False, quiet=False, limit=50, offset=0)
 
 
 @app.command("list")
