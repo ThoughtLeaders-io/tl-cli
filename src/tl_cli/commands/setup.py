@@ -233,7 +233,7 @@ def setup_claude(
     console.print("  [cyan]/tl-balance[/cyan]          — credit balance")
     console.print()
     console.print("Try it:")
-    console.print("  [cyan]/tl sold sponsorships for Nike in Q1[/cyan]")
+    console.print("  [cyan]/tl Which channels did we sponsor in Q1?[/cyan]")
     console.print()
     console.print("[dim]To update, run: tl setup claude[/dim]")
 
