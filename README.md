@@ -7,7 +7,7 @@ ThoughtLeaders CLI — query sponsorship data, channels, brands, and intelligenc
 ### As a developer
 
 ```bash
-git clone https://github.com/ThoughtLeaders-io/tl-cli
+git clone git+https://github.com/ThoughtLeaders-io/tl-cli.git
 cd tl-cli
 python -m venv .venv
 pip install -e .
@@ -16,10 +16,9 @@ pip install -e .
 ### As a user
 
 ```bash
-git clone https://github.com/ThoughtLeaders-io/tl-cli
-pipx install tl-cli
+pipx install git+https://github.com/ThoughtLeaders-io/tl-cli.git
 # or
-uv tool install tl-cli
+uv tool install git+https://github.com/ThoughtLeaders-io/tl-cli.git
 # or (but try to avoid it because just "pip" will not create a new venv for the product - only "uv" and "pipx" will do that)
 pip install tl-cli
 ```
