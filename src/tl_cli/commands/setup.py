@@ -195,8 +195,9 @@ def setup_claude(
             console.print("  Updating marketplace...")
             _run_claude(["plugin", "marketplace", "update", MARKETPLACE_NAME], claude_bin)
         else:
-            console.print(f"  [yellow]![/yellow] Marketplace registration failed: {output}")
-            console.print("    Continuing with standalone skill installation...")
+            console.print(f"  [red]✗[/red] Marketplace registration failed: {output}")
+            _print_manual_instructions()
+            raise SystemExit(1)
 
     # Step 2: Install plugin
     console.print("[bold]Installing plugin...[/bold]")
@@ -207,8 +208,10 @@ def setup_claude(
         if "already" in output.lower():
             console.print(f"  [green]✓[/green] Plugin already installed: {PLUGIN_KEY}")
         else:
-            console.print(f"  [yellow]![/yellow] Plugin installation failed: {output}")
-            console.print("    Continuing with standalone skill installation...")
+            console.print(f"  [red]✗[/red] Plugin installation failed: {output}")
+            console.print("    Try running inside Claude Code:")
+            console.print(f"    [cyan]/plugin install {PLUGIN_KEY}[/cyan]")
+            raise SystemExit(1)
 
     # Step 3: Install standalone skills for short /tl invocation
     _install_standalone_skills_step(plugin_root)
