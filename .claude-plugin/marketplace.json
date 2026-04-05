@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "tl-cli",
-      "source": ".",
+      "source": "./",
       "description": "ThoughtLeaders CLI — query sponsorship deals, channels, brands, uploads, and intelligence"
     }
   ]
