@@ -18,7 +18,7 @@ Customer's machine                    TL Infrastructure
 │  tl CLI      │──── HTTPS ────────▶│  Django API                      │
 │  (Python)    │  Bearer token       │  /api/cli/v1/...                 │
 │              │◀── JSON ───────────│                                   │
-└──────────────┘                     │  ┌─ PostgreSQL (deals, channels) │
+└──────────────┘                     │  ┌─ PostgreSQL (sponsorships, channels) │
        │                             │  ├─ Elasticsearch (uploads)      │
        │ Auth0 PKCE                  │  ├─ Firebolt (snapshots)         │
        ▼                             │  └─ Usage metering middleware    │
@@ -29,41 +29,53 @@ Customer's machine                    TL Infrastructure
 
 ### Structured commands (primary interface)
 
+All data commands use explicit subcommands: `list`, `show`, `create`/`add`. Running a command with no subcommand defaults to `list`.
+
 | Command | Description |
 |---------|-------------|
-| `tl deals [filters...]` | List sponsorship deals (adlink + adspot + channel + brand) |
-| `tl deals <id>` | Show deal detail |
-| `tl deals create --channel <id> --brand <id>` | Create a proposal (free, no credits) |
-| `tl uploads [filters...]` | List video uploads (ES) |
-| `tl uploads <id>` | Show upload detail |
-| `tl channels [filters...]` | Search channels |
-| `tl channels <id>` | Show channel detail |
-| `tl brands <brand>` | Brand intelligence report |
-| `tl brands <brand> --channel <id>` | Brand mentions on a specific channel |
+| `tl sponsorships list [filters...]` | List sponsorships (adlink + adspot + channel + brand) |
+| `tl sponsorships show <id>` | Show sponsorship detail |
+| `tl sponsorships create --channel <id> --brand <id>` | Create a proposal (free, no credits) |
+| `tl deals list [filters...]` | Shortcut: agreed-upon sponsorships (`status:deal`) |
+| `tl deals show <id>` | Show deal detail |
+| `tl matches list [filters...]` | Shortcut: possible brand-channel pairings (`status:match`) |
+| `tl matches show <id>` | Show match detail |
+| `tl matches create --channel <id> --brand <id>` | Create a match (free) |
+| `tl proposals list [filters...]` | Shortcut: matches proposed to both sides (`status:proposal`) |
+| `tl proposals show <id>` | Show proposal detail |
+| `tl proposals create --channel <id> --brand <id>` | Create a proposal (free) |
+| `tl uploads list [filters...]` | List video uploads (ES) |
+| `tl uploads show <id> [<id>...]` | Show upload detail(s) by ID |
+| `tl channels list [filters...]` | Search channels |
+| `tl channels show <id>` | Show channel detail |
+| `tl brands show <brand>` | Brand intelligence report |
+| `tl brands show <brand> --channel <id>` | Brand mentions on a specific channel |
 | `tl snapshots channel <id>` | Channel metrics over time (Firebolt channel_metrics) |
 | `tl snapshots video <id> --channel <id>` | Video view curve (Firebolt article_metrics, --channel required) |
-| `tl comments <adlink-id>` | List comments on a deal (free) |
+| `tl comments list <adlink-id>` | List comments on a sponsorship (free) |
 | `tl comments add <adlink-id> "message"` | Add a comment (free) |
 
 ### Flexible filtering (all list commands)
-Filters are passed as `key:value` pairs:
+Filters are passed as `key:value` pairs after `list`:
 ```bash
-tl deals status:sold brand:"Nike" since:2026-01
-tl deals status:pending owner:emma limit:20
-tl uploads channel:12345 type:longform since:2026-03
-tl channels category:cooking min-subs:100k language:en
+tl sponsorships list status:sold brand:"Nike" since:2026-01
+tl sponsorships list status:pending owner:emma limit:20
+tl uploads list channel:12345 type:longform since:2026-03
+tl channels list category:cooking min-subs:100k language:en
 ```
+
+Date filters (`since`, `until`, `send-date`, `send-date-before`, `publish-date`, `publish-date-before`) accept `today`, `yesterday`, and `tomorrow` as keywords — resolved to ISO dates on the CLI before sending to the server.
 
 ### Discoverability
 | Command | Description |
 |---------|-------------|
 | `tl describe` | List all resources with credit costs |
-| `tl describe deals` | Show fields, filters, and credit rate for deals |
-| `tl describe deals --filters` | Just the valid filters |
-| `tl describe deals --fields` | Just the data fields |
+| `tl describe sponsorships` | Show fields, filters, and credit rate for sponsorships |
+| `tl describe sponsorships --filters` | Just the valid filters |
+| `tl describe sponsorships --fields` | Just the data fields |
 | `tl docs` | Open full docs in browser |
 
-Schema metadata from server (`GET /api/cli/v1/describe/<resource>`) — always in sync. Includes credit cost per result. Free, no credits charged. Agent-friendly: `tl describe deals --json`.
+Schema metadata from server (`GET /api/cli/v1/describe/<resource>`) — always in sync. Includes credit cost per result. Free, no credits charged. Agent-friendly: `tl describe sponsorships --json`.
 
 ### Saved Reports
 | Command | Description |
@@ -86,6 +98,7 @@ Schema metadata from server (`GET /api/cli/v1/describe/<resource>`) — always i
 | `tl auth status` | Show auth state + credit balance |
 | `tl setup claude` | Install Claude Code plugin |
 | `tl doctor` | Health check (auth, connectivity, version, balance) |
+| `tl whoami` | Show current user, profile, org, and brands (free) |
 | `tl balance` | Show credit balance and recent usage |
 
 ### Global flags (all commands)
@@ -104,24 +117,24 @@ Schema metadata from server (`GET /api/cli/v1/describe/<resource>`) — always i
 
 | Command | Description |
 |---------|-------------|
-| `/tl <request>` | Smart router — Claude interprets the request and runs the right `tl` command(s). E.g., `/tl sold deals for Nike in Q1` → `tl deals status:sold brand:"Nike" since:2026-01-01 until:2026-03-31` |
-| `/tl-deals [query]` | Quick deal lookup. E.g., `/tl-deals pending with send dates in April` |
+| `/tl <request>` | Smart router — Claude interprets the request and runs the right `tl` command(s). E.g., `/tl sold sponsorships for Nike in Q1` → `tl sponsorships status:sold brand:"Nike" since:2026-01-01 until:2026-03-31` |
+| `/tl-sponsorships [query]` | Quick sponsorship lookup. E.g., `/tl-sponsorships pending with send dates in April` |
 | `/tl-channels [query]` | Channel search. E.g., `/tl-channels cooking channels over 100k subs` |
 | `/tl-brands [query]` | Brand intelligence. E.g., `/tl-brands Nike` |
 | `/tl-reports` | List and run saved reports |
 | `/tl-balance` | Check credit balance and recent usage |
 
 Each slash command's markdown file instructs Claude to:
-1. Run `tl describe <resource> --json` to discover available filters
+1. Run `tl describe show <resource> --json` to discover available filters
 2. Translate the user's natural language into the right `tl` command with filters
 3. Execute the command and present results
 4. Show breadcrumbs for follow-up actions
 
 #### Skill: `tl-data-analyst`
-Teaches Claude how to use the CLI effectively. Triggers on data questions about deals, channels, brands, sponsorships, uploads, metrics.
+Teaches Claude how to use the CLI effectively. Triggers on data questions about sponsorships, channels, brands, uploads, metrics.
 
 Key instructions in the skill:
-- Always run `tl describe <resource> --json` first to discover fields, filters, and credit costs
+- Always run `tl describe show <resource> --json` first to discover fields, filters, and credit costs
 - Use structured commands, not `tl ask` (the user's Claude IS the AI layer)
 - Check `tl balance --json` before expensive queries and warn the user about credit cost
 - Use `--json` output for parsing, `--quiet` for clean data
@@ -140,10 +153,10 @@ tools: [Bash, Read]
 ```
 
 What the agent does:
-- **Multi-step research**: "Find channels similar to the ones Nike sponsors and compare their pricing" → `tl brands Nike --json` → extract channel IDs → `tl channels <id> --json` for each → compile comparison table
-- **Cross-resource analysis**: "Show me deal slippage and add comments" → `tl deals status:pending send-date:2026-03 --json` → identify slipping deals → `tl comments add <id> "flagged for slippage"` for each
+- **Multi-step research**: "Find channels similar to the ones Nike sponsors and compare their pricing" → `tl brands show Nike --json` → extract channel IDs → `tl channels show <id> --json` for each → compile comparison table
+- **Cross-resource analysis**: "Show me deal slippage and add comments" → `tl sponsorships status:pending send-date:2026-03 --json` → identify slipping sponsorships → `tl comments add <id> "flagged for slippage"` for each
 - **Report comparison**: "Compare my Q1 report to Q4" → `tl reports run <id> --since 2026-01 --until 2026-03 --json` → `tl reports run <id> --since 2025-10 --until 2025-12 --json` → synthesize
-- **Discovery workflows**: "What's my best performing brand this quarter" → `tl deals status:sold since:2026-01 --json` → aggregate by brand → `tl brands <top_brand> --json` → full picture
+- **Discovery workflows**: "What's my best performing brand this quarter" → `tl sponsorships status:sold since:2026-01 --json` → aggregate by brand → `tl brands show <top_brand> --json` → full picture
 - **Credit-aware**: checks balance before multi-query workflows, estimates total cost, asks user to confirm if expensive
 
 #### Hooks
@@ -181,12 +194,12 @@ When Claude finishes a session:
 |----------|-------------------|-----------------|-----------|
 | **Brand intelligence** | 5 credits | 8 credits | Core IP — competitive intelligence on who sponsors whom |
 | **Channel** | 3 credits | 5 credits | Rich profile data, demographics, scores |
-| **Deal** | 2 credits | 3 credits | User's own sponsorship data |
+| **Sponsorship** | 2 credits | 3 credits | User's own sponsorship data |
 | **Snapshot** (Firebolt) | 1 credit | 1 credit | Time-series data points, high volume |
 | **Upload** (video) | 1 credit | 2 credits | Individual video data |
 | **Report run** | Sum of result credits | — | Charged based on what the report returns |
 | **Comment** | 0 | 0 | Operational — don't charge |
-| **Deal create** | 0 | — | Free — more proposals = more future data consumption |
+| **Sponsorship create** | 0 | — | Free — more proposals = more future data consumption |
 | **Describe / auth / doctor** | 0 | 0 | System + discoverability must be free |
 | **`tl ask` surcharge** | +2 credits per result | — | LLM cost surcharge (waived if user provides own key) |
 
@@ -233,8 +246,8 @@ credits = sum(results × rate_per_result) + surcharge_if_ask
     "balance_remaining": 4850
   },
   "_breadcrumbs": [
-    {"hint": "See deal details", "command": "tl deals 12345"},
-    {"hint": "Next page", "command": "tl deals status:sold offset:50"}
+    {"hint": "See sponsorship details", "command": "tl sponsorships 12345"},
+    {"hint": "Next page", "command": "tl sponsorships status:sold offset:50"}
   ]
 }
 ```
@@ -268,25 +281,29 @@ tl-cli/
 │   │   └── breadcrumbs.py            # Next-command hints + usage display
 │   ├── commands/
 │   │   ├── __init__.py
-│   │   ├── deals.py                  # tl deals (list/show/create)
+│   │   ├── sponsorships.py            # tl sponsorships (list/show/create) + shared do_list/do_show/do_create
+│   │   ├── deals.py                  # tl deals (shortcut: status:deal)
+│   │   ├── matches.py                # tl matches (shortcut: status:match)
+│   │   ├── proposals.py              # tl proposals (shortcut: status:proposal)
 │   │   ├── uploads.py                # tl uploads (list/show)
-│   │   ├── channels.py              # tl channels (search/show)
-│   │   ├── brands.py                # tl brands (brand intelligence)
+│   │   ├── channels.py              # tl channels (list/show)
+│   │   ├── brands.py                # tl brands show (brand intelligence)
 │   │   ├── snapshots.py             # tl snapshots (Firebolt metrics)
 │   │   ├── reports.py               # tl reports / tl reports run
 │   │   ├── comments.py              # tl comments (list/add)
-│   │   ├── describe.py              # tl describe (schema/filter/pricing discovery)
+│   │   ├── describe.py              # tl describe list/show (schema/filter/pricing discovery)
 │   │   ├── ask.py                   # tl ask (optional AI fallback)
 │   │   ├── setup.py                 # tl setup claude
 │   │   ├── balance.py               # tl balance
-│   │   └── doctor.py                # tl doctor
+│   │   ├── doctor.py                # tl doctor
+│   │   └── whoami.py                # tl whoami
 │   ├── filters.py                    # key:value filter parser (parsing only)
 │   └── _completions.py              # Shell completion helpers
 ├── .claude-plugin/
 │   └── plugin.json                   # Claude Code plugin manifest
 ├── commands/                          # Slash commands for Claude Code
 │   ├── tl.md                         # /tl — smart router
-│   ├── tl-deals.md                   # /tl-deals — quick deal lookup
+│   ├── tl-sponsorships.md             # /tl-sponsorships — quick sponsorship lookup
 │   ├── tl-channels.md                # /tl-channels — channel search
 │   ├── tl-brands.md                  # /tl-brands — brand intelligence
 │   ├── tl-reports.md                 # /tl-reports — saved reports
@@ -339,9 +356,9 @@ Most CLI endpoints can reuse existing views/utilities rather than being built fr
 
 | CLI Endpoint | Reuse From | What's New |
 |-------------|-----------|------------|
-| **`GET /api/cli/v1/deals`** | `api/v2/external-sponsorships` (`ExternalSponsorshipsView`) — already has org-scoped auth, returns adlink+channel+brand joined data, supports filters. Also reuse `SponsorshipsView` filter parsing from `api/sponsorships`. | Thin wrapper: translate `key:value` filters → existing view params, wrap in CLI envelope |
-| **`GET /api/cli/v1/deals/<id>`** | `api/sponsorships/<id>` (`SponsorshipsView` GET) — returns full deal detail with audit trail | Add CLI envelope + breadcrumbs |
-| **`POST /api/cli/v1/deals`** | `api/create-bulk-proposal` (`CreateBulkProposalView`) + MCP `save_proposals_for_email` in `mcp/proposals.py` | Adapt for single-proposal creation from CLI params |
+| **`GET /api/cli/v1/sponsorships`** | `api/v2/external-sponsorships` (`ExternalSponsorshipsView`) — already has org-scoped auth, returns adlink+channel+brand joined data, supports filters. Also reuse `SponsorshipsView` filter parsing from `api/sponsorships`. | Thin wrapper: translate `key:value` filters → existing view params, wrap in CLI envelope |
+| **`GET /api/cli/v1/sponsorships/<id>`** | `api/sponsorships/<id>` (`SponsorshipsView` GET) — returns full sponsorship detail with audit trail | Add CLI envelope + breadcrumbs |
+| **`POST /api/cli/v1/sponsorships`** | `api/create-bulk-proposal` (`CreateBulkProposalView`) + MCP `save_proposals_for_email` in `mcp/proposals.py` | Adapt for single-proposal creation from CLI params |
 | **`GET /api/cli/v1/uploads`** | `api/articles` (`ArticlesView`) — full ES article search with configurable columns, filters, aggregation. Already handles channel format, brand filters, content type. | Translate CLI filters → ArticlesView params. Restrict to VIDEO format. |
 | **`GET /api/cli/v1/uploads/<id>`** | `api/articles/<id>` (`SingleArticleView`) | Add CLI envelope |
 | **`GET /api/cli/v1/channels`** | `api/v2/external-youtube-thoughtleaders` (`ExternalYoutubeThoughtleadersView`) — rich ES-powered channel search with configurable columns, aggregation. Also `api/v1/channels/dropdown` for simple name search. | Translate CLI filters → existing view params |
@@ -353,6 +370,7 @@ Most CLI endpoints can reuse existing views/utilities rather than being built fr
 | **`GET /api/cli/v1/reports/<id>/run`** | `api/campaigns/<id>` detail + the view's existing data loading via `load_campaign_data()` in `data_api_utils.py` — campaigns store their filter config, which gets passed to the appropriate data view (SponsorshipsView, ArticlesView, ThoughtleadersView) | Load campaign config → dispatch to appropriate existing view → wrap results |
 | **`GET /api/cli/v1/comments/<adlink_id>`** | `api/comments/adlink/<id>` (`CommentsView` GET) — already paginated with read status | Add CLI envelope |
 | **`POST /api/cli/v1/comments/<adlink_id>`** | `api/comments/adlink/<id>` (`CommentsView` POST) — creates comment | Pass through |
+| **`GET /api/cli/v1/whoami`** | New — reads Profile, Organization, brands M2M | New (joins Profile → User, Organization → Plan, Profile.brands → ChannelList) |
 | **`GET /api/cli/v1/balance`** | New — reads `CliCreditAccount` | New (simple model read) |
 | **`GET /api/cli/v1/describe`** | New — static metadata | New (hardcoded resource definitions) |
 | **`POST /api/cli/v1/ask`** | New — LLM integration | New (but uses existing views for data execution) |
@@ -481,7 +499,7 @@ Build client and server together — the CLI is useless without the API.
 
 ### Step 2: Core data commands (both repos, endpoint by endpoint)
 Build each command + its server endpoint together:
-1. **Deals** — CLI command + server wrapper around `ExternalSponsorshipsView` / `SponsorshipsView`
+1. **Sponsorships** — CLI command + server wrapper around `ExternalSponsorshipsView` / `SponsorshipsView`
 2. **Channels** — CLI command + server wrapper around `ExternalYoutubeThoughtleadersView` / `ChannelAPIViewSet`
 3. **Uploads** — CLI command + server wrapper around `ArticlesView`
 4. **Brands** — CLI command + server wrapper around `BrandsViewSet` + ES brand mentions
@@ -491,7 +509,7 @@ Build each command + its server endpoint together:
 
 ### Step 3: Plugin + commands + agent + hooks
 1. `.claude-plugin/plugin.json`
-2. `commands/` — slash commands (`/tl`, `/tl-deals`, `/tl-channels`, `/tl-brands`, `/tl-reports`, `/tl-balance`)
+2. `commands/` — slash commands (`/tl`, `/tl-sponsorships`, `/tl-channels`, `/tl-brands`, `/tl-reports`, `/tl-balance`)
 3. `skills/tl/SKILL.md` — comprehensive skill file
 4. `agents/tl-analyst.md` — multi-step analysis agent
 5. `hooks/` — pre-check, post-usage, session-summary
@@ -508,19 +526,19 @@ Build each command + its server endpoint together:
 
 1. `pip install -e .` then `tl --help` shows all commands
 2. `tl describe` lists all resources with credit rates
-3. `tl describe deals --json` returns machine-readable schema + pricing
+3. `tl describe sponsorships --json` returns machine-readable schema + pricing
 4. `tl auth login` completes Auth0 PKCE flow
 5. `tl auth status` shows user + credit balance
 6. `tl balance` shows detailed usage
-7. `tl deals status:sold limit:5` — filter parsing + data returns
-8. `tl deals --json | jq '.results[0]'` — piping works
-9. `tl channels 12345` shows detail view (5 credits deducted)
+7. `tl sponsorships list status:sold limit:5` — filter parsing + data returns
+8. `tl sponsorships list --json | jq '.results[0]'` — piping works
+9. `tl channels show 12345` shows detail view (5 credits deducted)
 10. `tl snapshots channel 12345` returns Firebolt time-series
 11. `tl snapshots video abc --channel 12345` returns view curve
 12. `tl reports` lists saved reports (free)
 13. `tl reports run 789` executes saved report (credits based on results)
-14. `tl comments 12345` lists comments (free)
-15. `tl deals create --channel 1 --brand 2` creates proposal (free)
+14. `tl comments list 12345` lists comments (free)
+15. `tl sponsorships create --channel 1 --brand 2` creates proposal (free)
 16. `tl setup claude` installs plugin
 17. Claude Code skill triggers on data questions, uses `tl describe` for discovery
 18. Claude Code agent chains multiple `tl` commands for complex analysis

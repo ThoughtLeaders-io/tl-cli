@@ -9,9 +9,8 @@ from tl_cli.output.formatter import detect_format, output
 app = typer.Typer(help="Brand intelligence (sponsorship activity, channel mentions)")
 
 
-@app.callback(invoke_without_command=True)
-def brands(
-    ctx: typer.Context,
+@app.command("show")
+def show_cmd(
     query: str = typer.Argument(..., help="Brand name to research"),
     channel: int | None = typer.Option(None, "--channel", "-c", help="Filter to a specific channel"),
     json_output: bool = typer.Option(False, "--json", help="JSON output"),
@@ -26,12 +25,9 @@ def brands(
     Requires an Intelligence plan.
 
     Examples:
-        tl brands Nike                          # Nike's sponsorship intelligence
-        tl brands Nike --channel 12345          # Nike mentions on a specific channel
+        tl brands show Nike                          # Nike's sponsorship intelligence
+        tl brands show Nike --channel 12345          # Nike mentions on a specific channel
     """
-    if ctx.invoked_subcommand is not None:
-        return
-
     fmt = detect_format(json_output, csv_output, md_output, quiet)
 
     params: dict[str, str] = {"limit": str(limit), "offset": str(offset)}

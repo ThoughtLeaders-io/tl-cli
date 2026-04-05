@@ -8,8 +8,17 @@ Examples:
     → {"status": "sold", "brand": "Nike", "since": "2026-01"}
 """
 
+import datetime
 import re
 import sys
+
+DATE_FILTER_KEYS = {"since", "until", "send-date", "send-date-before", "publish-date", "publish-date-before"}
+
+DATE_KEYWORDS = {
+    "today": lambda: datetime.date.today(),
+    "yesterday": lambda: datetime.date.today() - datetime.timedelta(days=1),
+    "tomorrow": lambda: datetime.date.today() + datetime.timedelta(days=1),
+}
 
 
 def parse_filters(args: list[str]) -> dict[str, str]:
@@ -39,6 +48,11 @@ def parse_filters(args: list[str]) -> dict[str, str]:
             value.startswith("'") and value.endswith("'")
         ):
             value = value[1:-1]
+
+        if key in DATE_FILTER_KEYS:
+            resolved = DATE_KEYWORDS.get(value.lower())
+            if resolved:
+                value = resolved().isoformat()
 
         filters[key] = value
 

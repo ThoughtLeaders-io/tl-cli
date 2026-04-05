@@ -52,4 +52,4 @@ def setup_claude() -> None:
     console.print(f"  Location: {CLAUDE_PLUGINS_DIR}")
     console.print()
     console.print("Restart Claude Code to activate. Then try:")
-    console.print("  [cyan]/tl sold deals for Nike in Q1[/cyan]")
+    console.print("  [cyan]/tl sold sponsorships for Nike in Q1[/cyan]")
