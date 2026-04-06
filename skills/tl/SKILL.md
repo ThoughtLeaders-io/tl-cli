@@ -5,13 +5,41 @@ description: Query ThoughtLeaders sponsorship data using the tl CLI. Triggers on
 
 # ThoughtLeaders Data Analyst
 
-You have access to the `tl` CLI which queries ThoughtLeaders' sponsorship platform data. Use it to answer questions about deals, channels, brands, uploads, metrics, and more.
+You have access to the `tl` CLI which queries ThoughtLeaders' sponsorship platform data. Run it to answer questions about deals, channels, brands, uploads, metrics, and more.
 
 ## Core Principle
 
 **You are the intelligence layer.** Use structured `tl` commands, not `tl ask`. The `tl ask` command is a server-side LLM fallback for users without Claude — but the user has you. Translate their questions into the right `tl` commands.
 
+## Data Model & Terminology
+
+ThoughtLeaders is a sponsorship marketplace connecting **Brands** (advertisers / media buyers) with **Channels** (YouTube creators, podcasters / media sellers).
+
+The centre of the data model is **Sponsorships** — business relationships between brands and channels. Sponsorships have a funnel of types, from broad to narrow:
+
+- **Sponsorships** — the broadest category, encompassing all stages
+  - **Matches** — possible brand-channel pairings that ThoughtLeaders thinks could work
+  - **Proposals** — matches that have been proposed to both sides to consider
+  - **Deals** — contractually agreed-upon sponsorships (sold), either in production or published
+
+The CLI has shortcut commands for each type: `tl matches`, `tl proposals`, `tl deals`. These filter `tl sponsorships` by status.
+
+Other key concepts:
+- **Uploads** — YouTube videos indexed from Elasticsearch
+- **Snapshots** — historical time-series metrics for channels and videos (Firebolt)
+- **Reports** — saved report configurations that can be re-run
+- **Comments** — notes attached to sponsorships
+- **Send date** — the expected publication date for a sponsored video
+- **Credits** — every data query costs credits; use `tl describe` to see rates
+
+Users see data scoped by their organization and plan:
+- **Media buyers** see sponsorships where their org is the brand. They see `price` but never `cost`.
+- **Media sellers** see sponsorships where their org is the publisher. They see `cost` but never `price`.
+- **Intelligence plan** is required for `tl brands`, full channel search, and full uploads.
+
 ## Workflow
+
+At the start of session, run a `tl whoami` command to find out what you have access to.
 
 1. **Discover first**: Run `tl describe show <resource> --json` to learn available fields, filters, and credit costs before querying
 2. **Check saved reports**: Run `tl reports --json` to see if the user has a saved report that already answers their question

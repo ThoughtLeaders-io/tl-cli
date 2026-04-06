@@ -41,12 +41,21 @@ def do_list(
     """Shared list logic with optional default status filter."""
     filters = parse_filters(args)
 
+    # Status values that are equivalent to each shortcut's default
+    _EQUIVALENT_STATUSES = {
+        "deal": {"deal", "sold"},
+        "match": {"match", "matched"},
+        "proposal": {"proposal", "proposed", "pending", "outreach"},
+    }
+
     if default_status and "status" in filters:
-        Console(stderr=True).print(
-            f"[red]Error:[/red] The [bold]{title.lower()}[/bold] command does not accept a status filter.\n"
-            f"Use [bold]tl sponsorships list[/bold] for finer-grained status filtering."
-        )
-        raise typer.Exit(1)
+        allowed = _EQUIVALENT_STATUSES.get(default_status, {default_status})
+        if filters["status"] not in allowed:
+            Console(stderr=True).print(
+                f"[red]Error:[/red] The [bold]{title.lower()}[/bold] command does not accept status:{filters['status']}.\n"
+                f"Use [bold]tl sponsorships list[/bold] for finer-grained status filtering."
+            )
+            raise typer.Exit(1)
 
     if default_status:
         filters.setdefault("status", default_status)
