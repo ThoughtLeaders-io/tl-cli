@@ -120,6 +120,10 @@ Users only see data their plan allows:
 - **Intelligence plan** required for `tl brands`, full `tl channels list` search, and full `tl uploads list`.
 - **Paid plan** required for `tl snapshots`.
 
+## Important: Status Labels
+
+When presenting sponsorship status data, always use human-readable labels — never raw codes. The `tl` CLI returns lowercase labels (`sold`, `pending`, `matched`, etc.) — capitalize them for display. Full mapping: proposed, unavailable, pending, sold, advertiser_reject → "Rejected by Advertiser", publisher_reject → "Rejected by Publisher", proposal_approved → "Proposal Approved", matched, outreach → "Reached Out", agency_reject → "Rejected by Agency".
+
 ## Important: Firebolt Snapshots
 
 `tl snapshots video` **always requires** `--channel`. Without it, the query scans 7.4 billion rows and times out. Always provide the channel ID.
