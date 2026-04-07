@@ -53,6 +53,7 @@ If estimated cost > 200 credits, ask the user to confirm before proceeding.
 
 ## Rules
 
+- **Always resolve numeric codes to human-readable labels** in your output. Never show "Status 3" — show "Sold". Status mapping: 0=Proposed, 1=Unavailable, 2=Pending, 3=Sold, 4=Rejected by Advertiser, 5=Rejected by Publisher, 6=Proposal Approved, 7=Matched, 8=Reached Out, 9=Rejected by Agency.
 - Always use `--json` for output you need to parse
 - Always include `--limit` on list queries to control credit spend
 - For `tl snapshots video`, always include `--channel` (required for Firebolt performance)
