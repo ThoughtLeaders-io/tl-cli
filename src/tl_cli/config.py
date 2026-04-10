@@ -40,8 +40,9 @@ class Config:
         return f"{self.api_url.rstrip('/')}/api/cli/v1"
 
 
-# Global debug flag, set by --debug on the root command
+# Global flags, set by options on the root command
 debug: bool = False
+full_access: bool = False
 
 
 def get_config() -> Config:

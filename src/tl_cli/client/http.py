@@ -5,6 +5,7 @@ import httpx
 from tl_cli import __version__
 from tl_cli.auth.login import refresh_access_token
 from tl_cli.auth.token_store import load_tokens
+from tl_cli import config as tl_config
 from tl_cli.client.errors import ApiError
 from tl_cli.config import get_config
 
@@ -37,6 +38,10 @@ class TLClient:
         json_body: dict | None = None,
     ) -> dict:
         headers = self._auth_headers()
+
+        if tl_config.full_access:
+            params = dict(params) if params else {}
+            params['full_access'] = '1'
 
         response = self._client.request(
             method, path, params=params, json=json_body, headers=headers

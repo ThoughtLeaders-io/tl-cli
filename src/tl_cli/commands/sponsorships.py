@@ -5,13 +5,15 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+from tl_cli import config as tl_config
 from tl_cli.client.errors import handle_api_error, ApiError
 from tl_cli.client.http import get_client
 from tl_cli.filters import parse_filters
 from tl_cli.output.formatter import detect_format, output, output_single
 
 COLUMNS = ["id", "brand_id", "brand", "channel_id", "channel", "article_id", "status", "price", "send_date", "owner", "owner_email"]
-COLUMN_CONFIG = {"price": {"justify": "right"}}
+COLUMNS_FULL_ACCESS = ["id", "brand_id", "brand", "channel_id", "channel", "article_id", "status", "price", "cost", "send_date", "owner", "owner_email"]
+COLUMN_CONFIG = {"price": {"justify": "right"}, "cost": {"justify": "right"}}
 
 
 def _format_results(results: list[dict]) -> list[dict]:
@@ -20,12 +22,13 @@ def _format_results(results: list[dict]) -> list[dict]:
         sd = row.get("send_date")
         if sd and isinstance(sd, str) and "T" in sd:
             row["send_date"] = sd[:10]
-        price = row.get("price")
-        if price is not None:
-            try:
-                row["price"] = str(int(float(price)))
-            except (ValueError, TypeError):
-                pass
+        for field in ("price", "cost"):
+            val = row.get(field)
+            if val is not None:
+                try:
+                    row[field] = str(int(float(val)))
+                except (ValueError, TypeError):
+                    pass
     return results
 
 
@@ -66,7 +69,8 @@ def do_list(
         data = client.get("/sponsorships", params=params)
         if "results" in data:
             data["results"] = _format_results(data["results"])
-        output(data, fmt, columns=COLUMNS, title=title, column_config=COLUMN_CONFIG)
+        columns = COLUMNS_FULL_ACCESS if tl_config.full_access else COLUMNS
+        output(data, fmt, columns=columns, title=title, column_config=COLUMN_CONFIG)
     except ApiError as e:
         handle_api_error(e)
     finally:
