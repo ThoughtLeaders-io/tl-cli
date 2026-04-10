@@ -11,7 +11,7 @@ You have access to the `tl` CLI which queries ThoughtLeaders' sponsorship platfo
 
 **You are the intelligence layer.** Use structured `tl` commands, not `tl ask`. The `tl ask` command is a server-side LLM fallback for users without Claude — but the user has you. Translate their questions into the right `tl` commands.
 
-Use pagination in the `tl` commands to retrieve the whole data set if the user asks for complete data.
+Use pagination in the `tl` commands to retrieve the whole data set if the user asks for complete data. The maximum number of results per page is 200.
 
 ## Data Model & Terminology
 
@@ -41,7 +41,11 @@ Users see data scoped by their organization and plan:
 
 ## Workflow
 
-At the start of session, run a `tl whoami` command to find out what you have access to.
+At the start of session, run a `tl help` command to find out which commands are available, and the `tl whoami` command to find out what you have access to.
+
+If the user has the full_access permission and asks for the full data, use the `--full-access` command line parameter as the very first parameter to the `tl` executable.
+
+Unless the user specifically asks for running a specific report or showing the result of a specific report, find the data by using other, low-level commands.
 
 1. **Discover first**: Run `tl describe show <resource> --json` to learn available fields, filters, and credit costs before querying
 2. **Check saved reports**: Run `tl reports --json` to see if the user has a saved report that already answers their question
