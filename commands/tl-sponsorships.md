@@ -16,4 +16,6 @@ If no specific request is given, run `tl sponsorships list --limit 10` to show r
 Examples:
 - "/tl-sponsorships pending with send dates in April" → `tl sponsorships list status:pending send-date:2026-04`
 - "/tl-sponsorships Nike" → `tl sponsorships list brand:"Nike"`
+- "/tl-sponsorships sold deals on mobile-first channels" → `tl sponsorships list status:sold primary-device:mobile`
+- "/tl-sponsorships deals on channels with majority US audience" → `tl sponsorships list min-us-share:50`
 - "/tl-sponsorships 12345" → `tl sponsorships show 12345`

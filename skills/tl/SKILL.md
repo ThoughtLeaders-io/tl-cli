@@ -103,6 +103,30 @@ tl channels list category:cooking min-subs:100k language:en
 
 Date filters accept keywords: `today`, `yesterday`, `tomorrow`.
 
+#### Channel demographic filters
+
+These filters apply to both `tl channels list` and `tl sponsorships list` (the latter filters by the associated channel's demographics):
+
+```bash
+# Primary device type
+tl channels list primary-device:mobile
+tl channels list primary-device:desktop
+tl channels list primary-device:tablet
+
+# Minimum device audience share (0–100)
+tl channels list min-mobile-share:60
+tl channels list min-desktop-share:30
+tl channels list min-tablet-share:10
+
+# Minimum geo share (0–100, ISO country codes lowercase)
+tl channels list min-us-share:70
+tl channels list min-gb-share:25
+
+# Combine with other filters
+tl channels list category:tech primary-device:mobile min-us-share:50 min-subs:100k
+tl sponsorships list status:sold primary-device:mobile min-us-share:60
+```
+
 ### Output flags
 - `--json` — structured JSON (use this for parsing)
 - `--csv` — CSV output
@@ -156,4 +180,14 @@ tl snapshots video def789 --channel 456 --json
 ```bash
 tl reports --json  # Find the report ID first
 tl reports run 42 --json
+```
+
+"Find mobile-first US channels in cooking":
+```bash
+tl channels list category:cooking primary-device:mobile min-us-share:50 --json
+```
+
+"Show sold sponsorships targeting mobile US audiences":
+```bash
+tl sponsorships list status:sold primary-device:mobile min-us-share:60 --json
 ```
