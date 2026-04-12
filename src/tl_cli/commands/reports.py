@@ -1,6 +1,9 @@
 """tl reports — List, run, and create reports."""
 
 import json
+import os
+import subprocess
+import sys
 import time
 
 import typer
@@ -18,7 +21,8 @@ err = Console(stderr=True)
 # Report type labels matching Django's ReportType enum
 REPORT_TYPE_LABELS = {1: "Content", 2: "Brands", 3: "Channels", 8: "Sponsorships"}
 
-POLL_INTERVAL = 2  # seconds between polls
+KEYWORD_SUBPROCESS_TIMEOUT = 120
+SIMILAR_CHANNELS_TIMEOUT = 60
 
 
 @app.callback(invoke_without_command=True)
@@ -94,8 +98,56 @@ def run_report(
 
 
 # ---------------------------------------------------------------------------
-# tl reports create — AI Report Builder (server-side orchestration)
+# tl reports create — AI Report Builder (bundled skills orchestration)
 # ---------------------------------------------------------------------------
+
+
+def _find_skills_path() -> str:
+    """Locate the skills scripts directory.
+
+    Search order:
+    1. TL_SKILLS_PATH env var (explicit override)
+    2. Bundled inside the tl-cli package (installed via pip/pipx)
+    3. Sibling thoughtleaders-skills repo (dev checkout)
+    """
+    # 1. Explicit env var
+    env_path = os.environ.get("TL_SKILLS_PATH")
+    if env_path and os.path.isdir(env_path):
+        return env_path
+
+    # 2. Bundled with the package — look for skills/ relative to the installed package
+    #    pyproject.toml force-includes skills/ → tl_cli/_plugin/skills/
+    package_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    bundled = os.path.join(package_dir, "_plugin", "skills")
+    if os.path.isdir(bundled):
+        return bundled
+
+    # Also check the repo root (when running from source checkout)
+    repo_root = os.path.dirname(os.path.dirname(package_dir))
+    repo_skills = os.path.join(repo_root, "skills")
+    if os.path.isdir(repo_skills) and os.path.isfile(os.path.join(repo_skills, "create-report", "scripts", "orchestrate_preview.py")):
+        return repo_skills
+
+    # 3. Common dev locations
+    for path in [
+        os.path.expanduser("~/thoughtleaders-skills"),
+        os.path.expanduser("~/projects/thoughtleaders-skills"),
+        os.path.expanduser("~/code/thoughtleaders-skills"),
+    ]:
+        if os.path.isdir(path):
+            return path
+
+    return ""
+
+
+def _check_env_vars() -> list[str]:
+    """Check for required environment variables, return list of missing ones."""
+    missing = []
+    if not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY")):
+        missing.append("OPENROUTER_API_KEY")
+    if not (os.environ.get("ES_HOST") or os.environ.get("ELASTIC_SEARCH_URL")):
+        missing.append("ES_HOST")
+    return missing
 
 
 def _format_preview(config: dict) -> Panel:
@@ -156,35 +208,62 @@ def _format_preview(config: dict) -> Panel:
     return Panel(lines, title="[bold]Report Preview[/bold]", border_style="blue")
 
 
-def _poll_for_result(client, task_id: str, timeout: int) -> dict:
-    """Poll the server for the orchestration result. Returns the end_result dict."""
-    deadline = time.time() + timeout
-    last_message = ""
+def _run_orchestration(
+    skills_path: str,
+    prompt: str,
+    conversation: list[dict[str, str]],
+    timeout: int,
+) -> dict:
+    """Run orchestrate_preview.py from the bundled skills. Returns config dict."""
+    script = os.path.join(skills_path, "create-report", "scripts", "orchestrate_preview.py")
+    if not os.path.isfile(script):
+        err.print(f"[red]Script not found:[/red] {script}")
+        raise typer.Exit(1)
+
+    args = [sys.executable, script, "--prompt", prompt, "--conversation", json.dumps(conversation)]
 
     with err.status("[bold blue]Analyzing your request...[/bold blue]") as status:
-        while time.time() < deadline:
-            data = client.get(f"/reports/poll/{task_id}")
+        proc = subprocess.Popen(
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=os.environ.copy(),
+        )
 
-            # Stream status updates to terminal
-            status_log = data.get("status_log", [])
-            for entry in status_log:
-                if isinstance(entry, dict):
-                    msg = entry.get("description", "") or entry.get("title", "")
-                    if msg and msg != last_message:
-                        status.update(f"[bold blue]{msg}[/bold blue]")
-                        last_message = msg
+        stderr_lines: list[str] = []
+        try:
+            for line in proc.stderr:  # type: ignore[union-attr]
+                stderr_lines.append(line)
+                stripped = line.strip()
+                if stripped.startswith("{"):
+                    try:
+                        entry = json.loads(stripped)
+                        if isinstance(entry, dict) and "stage" in entry and "message" in entry:
+                            status.update(f"[bold blue]{entry['message']}[/bold blue]")
+                    except json.JSONDecodeError:
+                        pass
 
-            if data.get("finished"):
-                result = data.get("end_result")
-                if data.get("error") or not result:
-                    err.print("[red]Report generation failed on the server.[/red]")
-                    raise typer.Exit(1)
-                return result
+            stdout = proc.stdout.read() if proc.stdout else ""
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            err.print(f"[red]Orchestration timed out after {timeout}s[/red]")
+            raise typer.Exit(1)
 
-            time.sleep(POLL_INTERVAL)
+    if proc.returncode != 0:
+        stderr_text = "".join(stderr_lines)
+        err.print("[red]Report generation failed:[/red]")
+        error_lines = [l for l in stderr_text.strip().splitlines() if not l.strip().startswith("{")]
+        for line in error_lines[-5:]:
+            err.print(f"  {line}")
+        raise typer.Exit(1)
 
-    err.print(f"[red]Orchestration timed out after {timeout}s[/red]")
-    raise typer.Exit(1)
+    try:
+        return json.loads(stdout)
+    except json.JSONDecodeError:
+        err.print("[red]Failed to parse orchestrator output.[/red]")
+        raise typer.Exit(1)
 
 
 @app.command("create")
@@ -197,106 +276,98 @@ def create_report(
 ) -> None:
     """Create a report from a natural language description.
 
-    Sends your prompt to the ThoughtLeaders server, which runs the AI Report
-    Builder pipeline (keyword research, config generation, review). Then
-    confirms with the server to create the campaign.
+    Runs the AI Report Builder pipeline: keyword research, config generation,
+    and review. Then confirms with the server to create the campaign.
+
+    Requires: OPENROUTER_API_KEY, ES_HOST (or ELASTIC_SEARCH_URL).
 
     Examples:
         tl reports create "gaming channels sponsoring energy drinks"
         tl reports create "tech review channels with 100K+ subscribers" --yes
         tl reports create "beauty brands on YouTube" --json
     """
+    # Check prerequisites
+    skills_path = _find_skills_path()
+    if not skills_path:
+        err.print("[red]Cannot find skills scripts.[/red]")
+        err.print("Try: pip install --upgrade tl-cli")
+        raise typer.Exit(1)
+
+    missing_vars = _check_env_vars()
+    if missing_vars:
+        err.print(f"[red]Missing environment variables:[/red] {', '.join(missing_vars)}")
+        err.print("These are needed for LLM calls and keyword validation.")
+        raise typer.Exit(1)
+
+    # --- Stage 1 & 2: Run orchestration with follow-up support ---
+    conversation: list[dict[str, str]] = []
+    current_prompt = prompt
+
+    while True:
+        config = _run_orchestration(skills_path, current_prompt, conversation, timeout)
+        action = config.get("action", "create_report")
+
+        if action == "follow_up":
+            question = config.get("question", "Could you provide more details?")
+            suggestions = config.get("suggestions", [])
+            err.print(f"\n[yellow]{question}[/yellow]")
+            if suggestions:
+                for i, s in enumerate(suggestions, 1):
+                    title = s.get("title", s) if isinstance(s, dict) else s
+                    err.print(f"  [dim]{i}.[/dim] {title}")
+                err.print()
+
+            answer = typer.prompt("Your answer")
+
+            # Allow picking by number
+            try:
+                idx = int(answer.strip()) - 1
+                if 0 <= idx < len(suggestions):
+                    s = suggestions[idx]
+                    answer = s.get("title", s) if isinstance(s, dict) else s
+            except ValueError:
+                pass
+
+            conversation.append({"role": "user", "content": current_prompt})
+            conversation.append({"role": "assistant", "content": question})
+            current_prompt = answer
+            continue
+
+        if action in ("error", "unsupported"):
+            message = config.get("message", "Request could not be processed.")
+            err.print(f"\n[red]{message}[/red]")
+            suggestion = config.get("suggestion", "")
+            if suggestion:
+                err.print(f"[dim]{suggestion}[/dim]")
+            raise typer.Exit(1)
+
+        if action != "create_report":
+            err.print(f"[yellow]Unexpected action: {action}[/yellow]")
+            if json_output:
+                print(json.dumps(config, indent=2, default=str))
+            raise typer.Exit(1)
+
+        break  # Got a config, exit the loop
+
+    # --- Stage 3: Show preview ---
+    if json_output:
+        print(json.dumps(config, indent=2, default=str))
+        if not yes:
+            raise typer.Exit(0)
+    else:
+        err.print()
+        err.print(_format_preview(config))
+
+    # --- Stage 4: Confirm ---
+    if not yes:
+        confirmed = typer.confirm("Create this report?", default=True)
+        if not confirmed:
+            err.print("[dim]Cancelled.[/dim]")
+            raise typer.Exit(0)
+
+    # --- Stage 5: Call API to create the campaign ---
     client = get_client()
     try:
-        conversation: list[dict[str, str]] = []
-        current_prompt = prompt
-
-        # --- Stage 1 & 2: Send prompt, poll, handle follow-ups ---
-        while True:
-            try:
-                create_data = client.post("/reports/create", json_body={
-                    "prompt": current_prompt,
-                    "conversation": conversation,
-                })
-            except ApiError as e:
-                if e.status_code == 503:
-                    err.print("[red]AI Report Builder is temporarily unavailable. Please try again later.[/red]")
-                    raise typer.Exit(1)
-                handle_api_error(e)
-                raise typer.Exit(1)
-
-            task_id = create_data.get("task_id")
-            if not task_id:
-                err.print("[red]Server did not return a task ID.[/red]")
-                raise typer.Exit(1)
-
-            result = _poll_for_result(client, task_id, timeout)
-            action = result.get("action", "")
-
-            if action == "follow_up":
-                question = result.get("question", "Could you provide more details?")
-                suggestions = result.get("suggestions", [])
-                err.print(f"\n[yellow]{question}[/yellow]")
-                if suggestions:
-                    for i, s in enumerate(suggestions, 1):
-                        title = s.get("title", s) if isinstance(s, dict) else s
-                        err.print(f"  [dim]{i}.[/dim] {title}")
-                    err.print()
-
-                answer = typer.prompt("Your answer")
-
-                # Allow picking by number
-                try:
-                    idx = int(answer.strip()) - 1
-                    if 0 <= idx < len(suggestions):
-                        s = suggestions[idx]
-                        answer = s.get("title", s) if isinstance(s, dict) else s
-                except ValueError:
-                    pass
-
-                # Build conversation history for next round
-                conversation.append({"role": "user", "content": current_prompt})
-                conversation.append({"role": "assistant", "content": question})
-                current_prompt = answer
-                continue
-
-            if action in ("error", "unsupported"):
-                message = result.get("message", "Request could not be processed.")
-                err.print(f"\n[red]{message}[/red]")
-                suggestion = result.get("suggestion", "")
-                if suggestion:
-                    err.print(f"[dim]{suggestion}[/dim]")
-                raise typer.Exit(1)
-
-            if action == "preview":
-                config = result.get("config", {})
-            elif action == "create_report":
-                config = result
-            else:
-                err.print(f"[yellow]Unexpected action: {action}[/yellow]")
-                if json_output:
-                    print(json.dumps(result, indent=2, default=str))
-                raise typer.Exit(1)
-
-            break  # Got a config, exit the loop
-
-        # --- Stage 3: Show preview ---
-        if json_output:
-            print(json.dumps(config, indent=2, default=str))
-            if not yes:
-                raise typer.Exit(0)
-        else:
-            err.print()
-            err.print(_format_preview(config))
-
-        # --- Stage 4: Confirm ---
-        if not yes:
-            confirmed = typer.confirm("Create this report?", default=True)
-            if not confirmed:
-                err.print("[dim]Cancelled.[/dim]")
-                raise typer.Exit(0)
-
-        # --- Stage 5: Call API to create the campaign ---
         data = client.post("/reports/confirm", json_body={
             "config": config,
             "prompts": [prompt],
