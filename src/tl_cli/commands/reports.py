@@ -21,8 +21,7 @@ err = Console(stderr=True)
 # Report type labels matching Django's ReportType enum
 REPORT_TYPE_LABELS = {1: "Content", 2: "Brands", 3: "Channels", 8: "Sponsorships"}
 
-KEYWORD_SUBPROCESS_TIMEOUT = 120
-SIMILAR_CHANNELS_TIMEOUT = 60
+POLL_INTERVAL = 2  # seconds between server polls
 
 
 @app.callback(invoke_without_command=True)
@@ -98,56 +97,12 @@ def run_report(
 
 
 # ---------------------------------------------------------------------------
-# tl reports create — AI Report Builder (bundled skills orchestration)
+# tl reports create — AI Report Builder
+#
+# Two modes:
+#   1. Server-side (default): POST prompt → server runs pipeline → CLI polls
+#   2. Local (when TL_SKILLS_PATH is set): runs bundled skills locally
 # ---------------------------------------------------------------------------
-
-
-def _find_skills_path() -> str:
-    """Locate the skills scripts directory.
-
-    Search order:
-    1. TL_SKILLS_PATH env var (explicit override)
-    2. Bundled inside the tl-cli package (installed via pip/pipx)
-    3. Sibling thoughtleaders-skills repo (dev checkout)
-    """
-    # 1. Explicit env var
-    env_path = os.environ.get("TL_SKILLS_PATH")
-    if env_path and os.path.isdir(env_path):
-        return env_path
-
-    # 2. Bundled with the package — look for skills/ relative to the installed package
-    #    pyproject.toml force-includes skills/ → tl_cli/_plugin/skills/
-    package_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    bundled = os.path.join(package_dir, "_plugin", "skills")
-    if os.path.isdir(bundled):
-        return bundled
-
-    # Also check the repo root (when running from source checkout)
-    repo_root = os.path.dirname(os.path.dirname(package_dir))
-    repo_skills = os.path.join(repo_root, "skills")
-    if os.path.isdir(repo_skills) and os.path.isfile(os.path.join(repo_skills, "create-report", "scripts", "orchestrate_preview.py")):
-        return repo_skills
-
-    # 3. Common dev locations
-    for path in [
-        os.path.expanduser("~/thoughtleaders-skills"),
-        os.path.expanduser("~/projects/thoughtleaders-skills"),
-        os.path.expanduser("~/code/thoughtleaders-skills"),
-    ]:
-        if os.path.isdir(path):
-            return path
-
-    return ""
-
-
-def _check_env_vars() -> list[str]:
-    """Check for required environment variables, return list of missing ones."""
-    missing = []
-    if not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY")):
-        missing.append("OPENROUTER_API_KEY")
-    if not (os.environ.get("ES_HOST") or os.environ.get("ELASTIC_SEARCH_URL")):
-        missing.append("ES_HOST")
-    return missing
 
 
 def _format_preview(config: dict) -> Panel:
@@ -162,7 +117,6 @@ def _format_preview(config: dict) -> Panel:
     lines.append("Title: ", style="bold")
     lines.append(f"{title}\n")
 
-    # Keywords
     filterset = config.get("filterset", {})
     keyword_groups = filterset.get("keyword_groups", [])
     if keyword_groups:
@@ -180,7 +134,6 @@ def _format_preview(config: dict) -> Panel:
             lines.append(f" ... and {len(kw_texts) - 20} more")
         lines.append("\n")
 
-    # Key filters
     filters = []
     if filterset.get("languages"):
         filters.append(f"Languages: {', '.join(str(lang) for lang in filterset['languages'])}")
@@ -198,7 +151,6 @@ def _format_preview(config: dict) -> Panel:
         lines.append("; ".join(filters))
         lines.append("\n")
 
-    # Summary
     summary = config.get("summary", "")
     if summary:
         lines.append("\nSummary: ", style="bold dim")
@@ -208,27 +160,114 @@ def _format_preview(config: dict) -> Panel:
     return Panel(lines, title="[bold]Report Preview[/bold]", border_style="blue")
 
 
-def _run_orchestration(
-    skills_path: str,
-    prompt: str,
-    conversation: list[dict[str, str]],
-    timeout: int,
-) -> dict:
-    """Run orchestrate_preview.py from the bundled skills. Returns config dict."""
-    script = os.path.join(skills_path, "create-report", "scripts", "orchestrate_preview.py")
-    if not os.path.isfile(script):
-        err.print(f"[red]Script not found:[/red] {script}")
+# --- Server-side mode ---
+
+
+def _poll_for_result(client, task_id: str, timeout: int) -> dict:
+    """Poll the server for the orchestration result."""
+    deadline = time.time() + timeout
+    last_message = ""
+
+    with err.status("[bold blue]Analyzing your request...[/bold blue]") as status:
+        while time.time() < deadline:
+            data = client.get(f"/reports/poll/{task_id}")
+
+            for entry in data.get("status_log", []):
+                if isinstance(entry, dict):
+                    msg = entry.get("description", "") or entry.get("title", "")
+                    if msg and msg != last_message:
+                        status.update(f"[bold blue]{msg}[/bold blue]")
+                        last_message = msg
+
+            if data.get("finished"):
+                result = data.get("end_result")
+                if data.get("error") or not result:
+                    err.print("[red]Report generation failed on the server.[/red]")
+                    raise typer.Exit(1)
+                return result
+
+            time.sleep(POLL_INTERVAL)
+
+    err.print(f"[red]Orchestration timed out after {timeout}s[/red]")
+    raise typer.Exit(1)
+
+
+def _run_server_side(client, prompt: str, conversation: list[dict], timeout: int) -> dict:
+    """Send prompt to server, poll for result. Returns the end_result dict."""
+    try:
+        create_data = client.post("/reports/create", json_body={
+            "prompt": prompt,
+            "conversation": conversation,
+        })
+    except ApiError as e:
+        if e.status_code == 503:
+            err.print("[red]AI Report Builder is temporarily unavailable. Please try again later.[/red]")
+            raise typer.Exit(1)
+        raise
+
+    task_id = create_data.get("task_id")
+    if not task_id:
+        err.print("[red]Server did not return a task ID.[/red]")
         raise typer.Exit(1)
+
+    result = _poll_for_result(client, task_id, timeout)
+
+    # Server wraps response: "preview" → config in result["config"]
+    action = result.get("action", "")
+    if action == "preview":
+        return {**result.get("config", {}), "_server_result": result}
+    if action in ("follow_up", "error", "unsupported"):
+        return result
+    # Direct config (shouldn't happen but handle it)
+    return result
+
+
+# --- Local mode ---
+
+
+def _find_skills_path() -> str | None:
+    """Locate bundled skills scripts for local orchestration."""
+    # 1. Explicit env var
+    env_path = os.environ.get("TL_SKILLS_PATH")
+    if env_path and os.path.isdir(env_path):
+        return env_path
+
+    # 2. Bundled with package
+    package_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    bundled = os.path.join(package_dir, "_plugin", "skills")
+    if os.path.isdir(bundled) and os.path.isfile(os.path.join(bundled, "create-report", "scripts", "orchestrate_preview.py")):
+        return bundled
+
+    # 3. Repo root (source checkout)
+    repo_root = os.path.dirname(os.path.dirname(package_dir))
+    repo_skills = os.path.join(repo_root, "skills")
+    if os.path.isdir(repo_skills) and os.path.isfile(os.path.join(repo_skills, "create-report", "scripts", "orchestrate_preview.py")):
+        return repo_skills
+
+    return None
+
+
+def _can_run_locally() -> bool:
+    """Check if local orchestration is possible (skills + env vars)."""
+    if not _find_skills_path():
+        return False
+    if not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY")):
+        return False
+    if not (os.environ.get("ES_HOST") or os.environ.get("ELASTIC_SEARCH_URL")):
+        return False
+    return True
+
+
+def _run_local(skills_path: str, prompt: str, conversation: list[dict], timeout: int) -> dict:
+    """Run orchestrate_preview.py locally. Returns config dict."""
+    script = os.path.join(skills_path, "create-report", "scripts", "orchestrate_preview.py")
 
     args = [sys.executable, script, "--prompt", prompt, "--conversation", json.dumps(conversation)]
 
     with err.status("[bold blue]Analyzing your request...[/bold blue]") as status:
         proc = subprocess.Popen(
-            args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=os.environ.copy(),
+            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, env=os.environ.copy(),
         )
 
         stderr_lines: list[str] = []
@@ -266,6 +305,33 @@ def _run_orchestration(
         raise typer.Exit(1)
 
 
+# --- Main command ---
+
+
+def _handle_follow_up(result: dict, suggestions: list) -> str:
+    """Display follow-up question and get user's answer."""
+    question = result.get("question", "Could you provide more details?")
+    err.print(f"\n[yellow]{question}[/yellow]")
+    if suggestions:
+        for i, s in enumerate(suggestions, 1):
+            title = s.get("title", s) if isinstance(s, dict) else s
+            err.print(f"  [dim]{i}.[/dim] {title}")
+        err.print()
+
+    answer = typer.prompt("Your answer")
+
+    # Allow picking by number
+    try:
+        idx = int(answer.strip()) - 1
+        if 0 <= idx < len(suggestions):
+            s = suggestions[idx]
+            answer = s.get("title", s) if isinstance(s, dict) else s
+    except ValueError:
+        pass
+
+    return answer
+
+
 @app.command("create")
 def create_report(
     prompt: str = typer.Argument(..., help="Natural language description of the report you want"),
@@ -273,101 +339,90 @@ def create_report(
     json_output: bool = typer.Option(False, "--json", help="Output raw JSON config"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Minimal output"),
     timeout: int = typer.Option(300, "--timeout", help="Max orchestration time in seconds"),
+    local: bool = typer.Option(False, "--local", help="Force local orchestration (requires API keys)"),
 ) -> None:
     """Create a report from a natural language description.
 
-    Runs the AI Report Builder pipeline: keyword research, config generation,
-    and review. Then confirms with the server to create the campaign.
-
-    Requires: OPENROUTER_API_KEY, ES_HOST (or ELASTIC_SEARCH_URL).
+    By default, runs the AI pipeline on the server (no local API keys needed).
+    Use --local to run locally with your own keys (requires OPENROUTER_API_KEY, ES_HOST).
 
     Examples:
         tl reports create "gaming channels sponsoring energy drinks"
         tl reports create "tech review channels with 100K+ subscribers" --yes
-        tl reports create "beauty brands on YouTube" --json
+        tl reports create "beauty brands on YouTube" --local
     """
-    # Check prerequisites
-    skills_path = _find_skills_path()
-    if not skills_path:
-        err.print("[red]Cannot find skills scripts.[/red]")
-        err.print("Try: pip install --upgrade tl-cli")
-        raise typer.Exit(1)
+    # Decide mode: local if --local flag or TL_SKILLS_PATH is set with env vars
+    use_local = local or (os.environ.get("TL_SKILLS_PATH") and _can_run_locally())
 
-    missing_vars = _check_env_vars()
-    if missing_vars:
-        err.print(f"[red]Missing environment variables:[/red] {', '.join(missing_vars)}")
-        err.print("These are needed for LLM calls and keyword validation.")
-        raise typer.Exit(1)
-
-    # --- Stage 1 & 2: Run orchestration with follow-up support ---
-    conversation: list[dict[str, str]] = []
-    current_prompt = prompt
-
-    while True:
-        config = _run_orchestration(skills_path, current_prompt, conversation, timeout)
-        action = config.get("action", "create_report")
-
-        if action == "follow_up":
-            question = config.get("question", "Could you provide more details?")
-            suggestions = config.get("suggestions", [])
-            err.print(f"\n[yellow]{question}[/yellow]")
-            if suggestions:
-                for i, s in enumerate(suggestions, 1):
-                    title = s.get("title", s) if isinstance(s, dict) else s
-                    err.print(f"  [dim]{i}.[/dim] {title}")
-                err.print()
-
-            answer = typer.prompt("Your answer")
-
-            # Allow picking by number
-            try:
-                idx = int(answer.strip()) - 1
-                if 0 <= idx < len(suggestions):
-                    s = suggestions[idx]
-                    answer = s.get("title", s) if isinstance(s, dict) else s
-            except ValueError:
-                pass
-
-            conversation.append({"role": "user", "content": current_prompt})
-            conversation.append({"role": "assistant", "content": question})
-            current_prompt = answer
-            continue
-
-        if action in ("error", "unsupported"):
-            message = config.get("message", "Request could not be processed.")
-            err.print(f"\n[red]{message}[/red]")
-            suggestion = config.get("suggestion", "")
-            if suggestion:
-                err.print(f"[dim]{suggestion}[/dim]")
+    if use_local:
+        skills_path = _find_skills_path()
+        if not skills_path:
+            err.print("[red]Cannot find skills scripts for local mode.[/red]")
+            err.print("Set TL_SKILLS_PATH or install the latest tl-cli.")
+            raise typer.Exit(1)
+        missing = []
+        if not (os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_KEY")):
+            missing.append("OPENROUTER_API_KEY")
+        if not (os.environ.get("ES_HOST") or os.environ.get("ELASTIC_SEARCH_URL")):
+            missing.append("ES_HOST")
+        if missing:
+            err.print(f"[red]Local mode requires:[/red] {', '.join(missing)}")
             raise typer.Exit(1)
 
-        if action != "create_report":
-            err.print(f"[yellow]Unexpected action: {action}[/yellow]")
-            if json_output:
-                print(json.dumps(config, indent=2, default=str))
-            raise typer.Exit(1)
-
-        break  # Got a config, exit the loop
-
-    # --- Stage 3: Show preview ---
-    if json_output:
-        print(json.dumps(config, indent=2, default=str))
-        if not yes:
-            raise typer.Exit(0)
-    else:
-        err.print()
-        err.print(_format_preview(config))
-
-    # --- Stage 4: Confirm ---
-    if not yes:
-        confirmed = typer.confirm("Create this report?", default=True)
-        if not confirmed:
-            err.print("[dim]Cancelled.[/dim]")
-            raise typer.Exit(0)
-
-    # --- Stage 5: Call API to create the campaign ---
     client = get_client()
     try:
+        conversation: list[dict[str, str]] = []
+        current_prompt = prompt
+
+        while True:
+            # Run orchestration
+            if use_local:
+                config = _run_local(skills_path, current_prompt, conversation, timeout)  # type: ignore[arg-type]
+            else:
+                config = _run_server_side(client, current_prompt, conversation, timeout)
+
+            action = config.get("action", "create_report")
+
+            if action == "follow_up":
+                suggestions = config.get("suggestions", [])
+                answer = _handle_follow_up(config, suggestions)
+                conversation.append({"role": "user", "content": current_prompt})
+                conversation.append({"role": "assistant", "content": config.get("question", "")})
+                current_prompt = answer
+                continue
+
+            if action in ("error", "unsupported"):
+                message = config.get("message", "Request could not be processed.")
+                err.print(f"\n[red]{message}[/red]")
+                raise typer.Exit(1)
+
+            if action not in ("create_report", "preview"):
+                err.print(f"[yellow]Unexpected action: {action}[/yellow]")
+                if json_output:
+                    print(json.dumps(config, indent=2, default=str))
+                raise typer.Exit(1)
+
+            # Remove internal metadata before preview/confirm
+            config.pop("_server_result", None)
+            break
+
+        # --- Show preview ---
+        if json_output:
+            print(json.dumps(config, indent=2, default=str))
+            if not yes:
+                raise typer.Exit(0)
+        else:
+            err.print()
+            err.print(_format_preview(config))
+
+        # --- Confirm ---
+        if not yes:
+            confirmed = typer.confirm("Create this report?", default=True)
+            if not confirmed:
+                err.print("[dim]Cancelled.[/dim]")
+                raise typer.Exit(0)
+
+        # --- Save to server ---
         data = client.post("/reports/confirm", json_body={
             "config": config,
             "prompts": [prompt],
