@@ -18,7 +18,7 @@ err = Console(stderr=True)
 # Report type labels matching Django's ReportType enum
 REPORT_TYPE_LABELS = {1: "Content", 2: "Brands", 3: "Channels", 8: "Sponsorships"}
 
-POLL_INTERVAL = 2  # seconds between polls
+POLL_INTERVAL = 2  # seconds between server polls
 
 
 @app.callback(invoke_without_command=True)
@@ -94,7 +94,7 @@ def run_report(
 
 
 # ---------------------------------------------------------------------------
-# tl reports create — AI Report Builder (server-side orchestration)
+# tl reports create — AI Report Builder (server-side)
 # ---------------------------------------------------------------------------
 
 
@@ -110,7 +110,6 @@ def _format_preview(config: dict) -> Panel:
     lines.append("Title: ", style="bold")
     lines.append(f"{title}\n")
 
-    # Keywords
     filterset = config.get("filterset", {})
     keyword_groups = filterset.get("keyword_groups", [])
     if keyword_groups:
@@ -128,7 +127,6 @@ def _format_preview(config: dict) -> Panel:
             lines.append(f" ... and {len(kw_texts) - 20} more")
         lines.append("\n")
 
-    # Key filters
     filters = []
     if filterset.get("languages"):
         filters.append(f"Languages: {', '.join(str(lang) for lang in filterset['languages'])}")
@@ -146,7 +144,6 @@ def _format_preview(config: dict) -> Panel:
         lines.append("; ".join(filters))
         lines.append("\n")
 
-    # Summary
     summary = config.get("summary", "")
     if summary:
         lines.append("\nSummary: ", style="bold dim")
@@ -157,7 +154,7 @@ def _format_preview(config: dict) -> Panel:
 
 
 def _poll_for_result(client, task_id: str, timeout: int) -> dict:
-    """Poll the server for the orchestration result. Returns the end_result dict."""
+    """Poll the server for the orchestration result."""
     deadline = time.time() + timeout
     last_message = ""
 
@@ -165,9 +162,7 @@ def _poll_for_result(client, task_id: str, timeout: int) -> dict:
         while time.time() < deadline:
             data = client.get(f"/reports/poll/{task_id}")
 
-            # Stream status updates to terminal
-            status_log = data.get("status_log", [])
-            for entry in status_log:
+            for entry in data.get("status_log", []):
                 if isinstance(entry, dict):
                     msg = entry.get("description", "") or entry.get("title", "")
                     if msg and msg != last_message:
@@ -185,6 +180,31 @@ def _poll_for_result(client, task_id: str, timeout: int) -> dict:
 
     err.print(f"[red]Orchestration timed out after {timeout}s[/red]")
     raise typer.Exit(1)
+
+
+def _handle_follow_up(result: dict) -> str:
+    """Display follow-up question and get user's answer."""
+    question = result.get("question", "Could you provide more details?")
+    suggestions = result.get("suggestions", [])
+    err.print(f"\n[yellow]{question}[/yellow]")
+    if suggestions:
+        for i, s in enumerate(suggestions, 1):
+            title = s.get("title", s) if isinstance(s, dict) else s
+            err.print(f"  [dim]{i}.[/dim] {title}")
+        err.print()
+
+    answer = typer.prompt("Your answer")
+
+    # Allow picking by number
+    try:
+        idx = int(answer.strip()) - 1
+        if 0 <= idx < len(suggestions):
+            s = suggestions[idx]
+            answer = s.get("title", s) if isinstance(s, dict) else s
+    except ValueError:
+        pass
+
+    return answer
 
 
 @app.command("create")
@@ -211,8 +231,8 @@ def create_report(
         conversation: list[dict[str, str]] = []
         current_prompt = prompt
 
-        # --- Stage 1 & 2: Send prompt, poll, handle follow-ups ---
         while True:
+            # Send prompt to server, poll for result
             try:
                 create_data = client.post("/reports/create", json_body={
                     "prompt": current_prompt,
@@ -233,39 +253,17 @@ def create_report(
             result = _poll_for_result(client, task_id, timeout)
             action = result.get("action", "")
 
+            # Server wraps response: "preview" → config in result["config"]
             if action == "follow_up":
-                question = result.get("question", "Could you provide more details?")
-                suggestions = result.get("suggestions", [])
-                err.print(f"\n[yellow]{question}[/yellow]")
-                if suggestions:
-                    for i, s in enumerate(suggestions, 1):
-                        title = s.get("title", s) if isinstance(s, dict) else s
-                        err.print(f"  [dim]{i}.[/dim] {title}")
-                    err.print()
-
-                answer = typer.prompt("Your answer")
-
-                # Allow picking by number
-                try:
-                    idx = int(answer.strip()) - 1
-                    if 0 <= idx < len(suggestions):
-                        s = suggestions[idx]
-                        answer = s.get("title", s) if isinstance(s, dict) else s
-                except ValueError:
-                    pass
-
-                # Build conversation history for next round
+                answer = _handle_follow_up(result)
                 conversation.append({"role": "user", "content": current_prompt})
-                conversation.append({"role": "assistant", "content": question})
+                conversation.append({"role": "assistant", "content": result.get("question", "")})
                 current_prompt = answer
                 continue
 
             if action in ("error", "unsupported"):
                 message = result.get("message", "Request could not be processed.")
                 err.print(f"\n[red]{message}[/red]")
-                suggestion = result.get("suggestion", "")
-                if suggestion:
-                    err.print(f"[dim]{suggestion}[/dim]")
                 raise typer.Exit(1)
 
             if action == "preview":
@@ -278,9 +276,9 @@ def create_report(
                     print(json.dumps(result, indent=2, default=str))
                 raise typer.Exit(1)
 
-            break  # Got a config, exit the loop
+            break
 
-        # --- Stage 3: Show preview ---
+        # --- Show preview ---
         if json_output:
             print(json.dumps(config, indent=2, default=str))
             if not yes:
@@ -289,14 +287,14 @@ def create_report(
             err.print()
             err.print(_format_preview(config))
 
-        # --- Stage 4: Confirm ---
+        # --- Confirm ---
         if not yes:
             confirmed = typer.confirm("Create this report?", default=True)
             if not confirmed:
                 err.print("[dim]Cancelled.[/dim]")
                 raise typer.Exit(0)
 
-        # --- Stage 5: Call API to create the campaign ---
+        # --- Save to server ---
         data = client.post("/reports/confirm", json_body={
             "config": config,
             "prompts": [prompt],
