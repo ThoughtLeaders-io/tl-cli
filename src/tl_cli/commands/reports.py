@@ -208,63 +208,77 @@ def create_report(
     """
     client = get_client()
     try:
-        # --- Stage 1: Send prompt to server, poll for result ---
-        try:
-            create_data = client.post("/reports/create", json_body={
-                "prompt": prompt,
-                "conversation": [],
-            })
-        except ApiError as e:
-            if e.status_code == 503:
-                err.print("[red]AI Report Builder is temporarily unavailable. Please try again later.[/red]")
+        conversation: list[dict[str, str]] = []
+        current_prompt = prompt
+
+        # --- Stage 1 & 2: Send prompt, poll, handle follow-ups ---
+        while True:
+            try:
+                create_data = client.post("/reports/create", json_body={
+                    "prompt": current_prompt,
+                    "conversation": conversation,
+                })
+            except ApiError as e:
+                if e.status_code == 503:
+                    err.print("[red]AI Report Builder is temporarily unavailable. Please try again later.[/red]")
+                    raise typer.Exit(1)
+                handle_api_error(e)
                 raise typer.Exit(1)
-            handle_api_error(e)
-            raise typer.Exit(1)
 
-        task_id = create_data.get("task_id")
-        if not task_id:
-            err.print("[red]Server did not return a task ID.[/red]")
-            raise typer.Exit(1)
+            task_id = create_data.get("task_id")
+            if not task_id:
+                err.print("[red]Server did not return a task ID.[/red]")
+                raise typer.Exit(1)
 
-        result = _poll_for_result(client, task_id, timeout)
+            result = _poll_for_result(client, task_id, timeout)
+            action = result.get("action", "")
 
-        # --- Stage 2: Handle the result action ---
-        # The server wraps the LLM response through NLSearchResult:
-        #   "preview" → config is in result["config"]
-        #   "follow_up" → question/suggestions at top level
-        #   "error"/"unsupported" → message at top level
-        action = result.get("action", "")
+            if action == "follow_up":
+                question = result.get("question", "Could you provide more details?")
+                suggestions = result.get("suggestions", [])
+                err.print(f"\n[yellow]{question}[/yellow]")
+                if suggestions:
+                    for i, s in enumerate(suggestions, 1):
+                        title = s.get("title", s) if isinstance(s, dict) else s
+                        err.print(f"  [dim]{i}.[/dim] {title}")
+                    err.print()
 
-        if action == "follow_up":
-            question = result.get("question", "Could you provide more details?")
-            suggestions = result.get("suggestions", [])
-            err.print(f"\n[yellow]Clarification needed:[/yellow] {question}")
-            if suggestions:
-                err.print("\n[dim]Suggestions:[/dim]")
-                for s in suggestions:
-                    if isinstance(s, dict):
-                        err.print(f"  • {s.get('title', s)}")
-                    else:
-                        err.print(f"  • {s}")
-            raise typer.Exit(0)
+                answer = typer.prompt("Your answer")
 
-        if action in ("error", "unsupported"):
-            message = result.get("message", "Request could not be processed.")
-            err.print(f"\n[red]{message}[/red]")
-            suggestion = result.get("suggestion", "")
-            if suggestion:
-                err.print(f"[dim]{suggestion}[/dim]")
-            raise typer.Exit(1)
+                # Allow picking by number
+                try:
+                    idx = int(answer.strip()) - 1
+                    if 0 <= idx < len(suggestions):
+                        s = suggestions[idx]
+                        answer = s.get("title", s) if isinstance(s, dict) else s
+                except ValueError:
+                    pass
 
-        if action == "preview":
-            config = result.get("config", {})
-        elif action == "create_report":
-            config = result
-        else:
-            err.print(f"[yellow]Unexpected action: {action}[/yellow]")
-            if json_output:
-                print(json.dumps(result, indent=2, default=str))
-            raise typer.Exit(1)
+                # Build conversation history for next round
+                conversation.append({"role": "user", "content": current_prompt})
+                conversation.append({"role": "assistant", "content": question})
+                current_prompt = answer
+                continue
+
+            if action in ("error", "unsupported"):
+                message = result.get("message", "Request could not be processed.")
+                err.print(f"\n[red]{message}[/red]")
+                suggestion = result.get("suggestion", "")
+                if suggestion:
+                    err.print(f"[dim]{suggestion}[/dim]")
+                raise typer.Exit(1)
+
+            if action == "preview":
+                config = result.get("config", {})
+            elif action == "create_report":
+                config = result
+            else:
+                err.print(f"[yellow]Unexpected action: {action}[/yellow]")
+                if json_output:
+                    print(json.dumps(result, indent=2, default=str))
+                raise typer.Exit(1)
+
+            break  # Got a config, exit the loop
 
         # --- Stage 3: Show preview ---
         if json_output:
