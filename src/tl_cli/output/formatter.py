@@ -168,7 +168,7 @@ def _output_markdown(results: list[dict], columns: list[str]) -> None:
         print("| " + " | ".join(values) + " |")
 
 
-_RIGHT_ALIGN_COLS = {"price", "cost", "price_cpm", "cost_cpm"}
+_RIGHT_ALIGN_COLS = {"price", "cost", "cpm"}
 
 
 def _is_list_of_dicts(value: object) -> bool:

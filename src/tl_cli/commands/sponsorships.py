@@ -11,9 +11,14 @@ from tl_cli.client.http import get_client
 from tl_cli.filters import parse_filters
 from tl_cli.output.formatter import detect_format, output, output_single
 
-COLUMNS = ["id", "created_at", "brand_id", "brand", "channel_id", "channel", "article_id", "views", "status", "price", "owner_sales_email"]
-COLUMNS_FULL_ACCESS = ["id", "created_at", "brand_id", "brand", "channel_id", "channel", "article_id", "views", "status", "price", "cost", "owner_sales_email"]
-COLUMN_CONFIG = {"price": {"justify": "right"}, "cost": {"justify": "right"}, "views": {"justify": "right"}}
+COLUMNS = ["id", "created_at", "brand_id", "brand", "channel_id", "channel", "article_id", "views", "status", "price", "cpm", "owner_sales_email"]
+COLUMNS_FULL_ACCESS = ["id", "created_at", "brand_id", "brand", "channel_id", "channel", "article_id", "views", "status", "price", "cost", "cpm", "owner_sales_email"]
+COLUMN_CONFIG = {
+    "price": {"justify": "right"},
+    "cost": {"justify": "right"},
+    "views": {"justify": "right"},
+    "cpm": {"justify": "right"},
+}
 
 
 def _format_results(results: list[dict]) -> list[dict]:

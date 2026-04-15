@@ -11,7 +11,9 @@ You have access to the `tl` CLI which queries ThoughtLeaders' sponsorship platfo
 
 **You are the intelligence layer.** Use structured `tl` commands, not `tl ask`. The `tl ask` command is a server-side LLM fallback for users without Claude — but the user has you. Translate their questions into the right `tl` commands.
 
-Use pagination in the `tl` commands to retrieve the whole data set if the user asks for complete data. The maximum number of results per page is 200. Retry after 5 seconds if the server returns a "connection denied" or a "server error".
+Use pagination in the `tl` commands to retrieve the whole data set if the user doesn't specifically ask for a subset of data. The maximum number of results per page is 500.
+
+Retry after 5 seconds if the server returns a "connection denied" or a "server error" on any request.
 
 ## Data Model & Terminology
 
@@ -31,8 +33,12 @@ Other key concepts:
 - **Snapshots** — historical time-series metrics for channels and videos (Firebolt)
 - **Reports** — saved report configurations that can be re-run
 - **Comments** — notes attached to sponsorships
-- **Adspots** — types of ads a channel carries (e.g. mention, dedicated video, product placement). Returned by `tl channels show`; each carries price/cost and computed CPM.
-- **`impression`** (on channels) — projected views per video on that channel. Used as the denominator for CPM calculations on adspots. May be null when not yet computed for a channel.
+- **Adspots** — types of ads a channel carries (e.g. mention, dedicated video, product placement). Returned by `tl channels show`; each carries price/cost.
+- **`impression`** (on channels) — projected views per video on that channel. Forward-looking estimate. May be null when not yet computed.
+- **`views`** (on sponsorships) — actual view count of the sold and published sponsored video, accessible when `article_id` is set.
+- **CPM** has two distinct meanings depending on level — pick the one the user actually wants:
+  - **Channel CPM** = `(adspot.price / channel.impression) × 1000` — projected price per thousand projected views. Used for pricing decisions **before** a sponsorship is sold. Available for channels with active adspots via `tl channels show <channel_id>`.
+  - **Sponsorship CPM** = calculated in either of two ways: if `views` is present, then CPM is `(sponsorship.price / sponsorship.views) × 1000`, meaning realized cost per thousand actual views, computed post-publication. If `views` is null, Compute from the sponsorship's `price` and the channel's `impression` fields.
 - **Sponsorship dates** — each sponsorship has four distinct dates, useful for different queries:
   - **`created_at`** — when the sponsorship record was created in the system
   - **`purchase_date`** — when the sponsorship was purchased (i.e. when the deal was made); These make up bookings.
@@ -45,13 +51,15 @@ Users see data scoped by their organization and plan:
 - **Media sellers** see sponsorships where their org is the publisher. They see `cost` but never `price`.
 - **Intelligence plan** is required for `tl brands`, full channel search, and full uploads.
 
-When querying sponsorship bookings, query by state:sold and filter the the date range only by `purchase_date`. Otherwise, query for state:sold by `created_at`.
+When querying sponsorship bookings, query by `status:sold` and filter the the date range only by `purchase_date`. Otherwise, query for state:sold by `created_at`.
+
+An obsolete name for "sponsorship" is an "adlink".
 
 ## Workflow
 
 At the start of session, always run a `tl help` command to find out which commands are available, and the `tl whoami` command to find out what you have access to.
 
-If the user has the full_access permission, always use the `--full-access` command line parameter as the very first parameter to the `tl` executable.
+If the user has the `full_access` permission, always use the `--full-access` command line parameter as the very first parameter to the `tl` executable.
 
 Unless the user specifically asks for running a specific report or showing the result of a specific report, find the data by using other, low-level commands.
 
@@ -63,7 +71,7 @@ Unless the user specifically asks for running a specific report or showing the r
 6. **Chain commands**: For complex questions, chain multiple `tl` commands
 7. **Format results**: When the user asks for a list or tabular data, present the results as a well-formatted markdown table. Pick the most relevant columns and use clear headers.
 
-Prefer writing Python code that fetches or analysises large sets of data, instead of using `jq` or analysing it yourself. Create temporary files in `/tmp` that can be analysed later in different ways.
+Prefer writing Python code, shell code, or `jq` commands that fetche or analysise large sets of data, instead of analysing it yourself. Create temporary files in `/tmp` that can be analysed later in different ways.
 
 ## Available Commands
 
@@ -145,12 +153,28 @@ tl sponsorships list status:sold primary-device:mobile min-us-share:60
 - `--limit N` — max results
 - `--offset N` — pagination
 
+### Response shape
+Successful `--json` responses wrap data in an envelope:
+
+```json
+{
+  "results": [ { "...": "..." } ],
+  "total": 42,
+  "usage": { "credits_charged": 2, "balance_remaining": 9998 },
+  "_breadcrumbs": [ { "hint": "...", "command": "tl ..." } ]
+}
+```
+
+`--quiet` strips everything but `results`. Errors return `{"detail": "..."}` with an HTTP status (400 / 401 / 403 / 404).
+
+While analysing results, you must always examine the `results` field in the JSON.
+
 ## Credit Awareness
 
 Every query costs credits. Before running expensive queries:
-1. Check the credit rate: `tl describe show <resource> --json | jq '.credits'`
+1. Check the credit rate: `tl describe show <resource> --json | jq '.credits'` and the user balance.
 2. Estimate cost: results × rate
-3. If estimated cost > 100 credits, tell the user before running
+3. If estimated cost is more than 10% of the remaining balance, ask the user to confirm the operation before running.
 
 ## Data Scoping
 

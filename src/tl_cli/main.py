@@ -166,7 +166,13 @@ def help_command(
 
 
 def cli() -> None:
-    """Entry point that wraps the Typer app with top-level error handling."""
+    """Entry point that wraps the Typer app with top-level error handling.
+
+    The `finally` block runs the post-command version check for pipx/uv
+    installs on every exit path — normal return, typer's SystemExit, or
+    the sys.exit(1) in the error branch. Silent on failure.
+    """
+    from tl_cli.self_update import check_and_upgrade
     try:
         app()
     except SystemExit:
@@ -178,6 +184,8 @@ def cli() -> None:
             Console(stderr=True).print(f"[red]Error:[/red] {exc}")
             Console(stderr=True).print("[dim]Run with --debug for details.[/dim]")
         sys.exit(1)
+    finally:
+        check_and_upgrade()
 
 
 if __name__ == "__main__":
