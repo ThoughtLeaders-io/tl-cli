@@ -52,7 +52,8 @@ def _write_cache(latest: str | None) -> None:
     try:
         CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
         CACHE_PATH.write_text(json.dumps({"checked_at": time.time(), "latest": latest}))
-    except OSError:
+    except OSError as e:
+        print(f"Error writing cache: {e}", file=sys.stderr)
         pass
 
 
