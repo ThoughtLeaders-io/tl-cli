@@ -11,7 +11,7 @@ You have access to the `tl` CLI which queries ThoughtLeaders' sponsorship platfo
 
 **You are the intelligence layer.** Use structured `tl` commands, not `tl ask`. The `tl ask` command is a server-side LLM fallback for users without Claude — but the user has you. Translate their questions into the right `tl` commands.
 
-Use pagination in the `tl` commands to retrieve the whole data set if the user asks for complete data. The maximum number of results per page is 200.
+Use pagination in the `tl` commands to retrieve the whole data set if the user asks for complete data. The maximum number of results per page is 200. Retry after 5 seconds if the server returns a "connection denied" or a "server error".
 
 ## Data Model & Terminology
 
