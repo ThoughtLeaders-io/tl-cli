@@ -4,15 +4,25 @@ This module only handles parsing — it does not know which filters are valid
 for which resource. Each command module validates its own filters.
 
 Examples:
-    parse_filters(["status:sold", 'brand:"Nike"', "since:2026-01"])
-    → {"status": "sold", "brand": "Nike", "since": "2026-01"}
+    parse_filters(["status:sold", 'brand:"Nike"', "created-at:2026-01"])
+    → {"status": "sold", "brand": "Nike", "created-at": "2026-01"}
 """
 
 import datetime
 import re
 import sys
 
-DATE_FILTER_KEYS = {"since", "until", "send-date", "send-date-before", "publish-date", "publish-date-before"}
+DATE_FILTER_KEYS = {
+    # uploads (publication_date lower bound)
+    "since",
+    # sponsorships date filters — see RESOURCES['sponsorships'].filters.
+    # For each field, <prefix>:<date> filters within that date/period,
+    # and <prefix>-start/-end:<date> give inclusive lower/upper bounds.
+    "created-at", "created-at-start", "created-at-end",
+    "publish-date", "publish-date-start", "publish-date-end",
+    "purchase-date", "purchase-date-start", "purchase-date-end",
+    "send-date", "send-date-start", "send-date-end",
+}
 
 DATE_KEYWORDS = {
     "today": lambda: datetime.date.today(),

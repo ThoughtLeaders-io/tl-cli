@@ -37,11 +37,11 @@ tl setup opencode      # install OpenCode skill (optional)
 tl auth login
 
 # Query sponsorships
-tl sponsorships list status:sold brand:"Nike" since:2026-01
+tl sponsorships list status:sold brand:"Nike" purchase-date:2026-01
 
 # Shortcut commands for sponsorship types
 tl deals list brand:"Nike"                    # Agreed-upon sponsorships
-tl deals list since:today                     # Deals from today (date keywords: today, yesterday, tomorrow)
+tl deals list created-at:today                # Deals created today (date keywords: today, yesterday, tomorrow)
 tl matches list                               # Possible brand-channel pairings
 tl proposals list                             # Matches proposed to both sides
 

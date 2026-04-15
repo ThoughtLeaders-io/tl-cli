@@ -27,7 +27,7 @@ If estimated cost > 200 credits, ask the user to confirm before proceeding.
 
 ### Cross-resource analysis
 "Show me deal slippage this month"
-1. `tl sponsorships list status:pending send-date-before:2026-03-31 --json`
+1. `tl sponsorships list status:pending send-date-end:2026-03-31 --json`
 2. Identify sponsorships with past send dates that aren't sold
 3. Present findings, suggest `tl comments add` for each
 
@@ -40,7 +40,7 @@ If estimated cost > 200 credits, ask the user to confirm before proceeding.
 
 ### Discovery workflows
 "What's our best performing brand this quarter?"
-1. `tl deals list since:2026-01-01 --json` → aggregate revenue by brand
+1. `tl deals list purchase-date-start:2026-01-01 --json` → aggregate revenue by brand
 2. `tl brands show <top_brand> --json` → sponsorship intelligence
 3. `tl snapshots channel <id> --json` → performance metrics for top channels
 

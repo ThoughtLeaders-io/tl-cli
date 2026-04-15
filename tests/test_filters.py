@@ -10,8 +10,8 @@ class TestParseFilters:
         assert parse_filters(["status:sold"]) == {"status": "sold"}
 
     def test_multiple_filters(self):
-        result = parse_filters(["status:sold", "brand:Nike", "since:2026-01"])
-        assert result == {"status": "sold", "brand": "Nike", "since": "2026-01"}
+        result = parse_filters(["status:sold", "brand:Nike", "created-at:2026-01"])
+        assert result == {"status": "sold", "brand": "Nike", "created-at": "2026-01"}
 
     def test_quoted_value_double(self):
         assert parse_filters(['brand:"Hello World"']) == {"brand": "Hello World"}
@@ -23,7 +23,7 @@ class TestParseFilters:
         assert parse_filters([]) == {}
 
     def test_hyphenated_key(self):
-        assert parse_filters(["send-date:2026-01"]) == {"send-date": "2026-01"}
+        assert parse_filters(["send-date-start:2026-01"]) == {"send-date-start": "2026-01"}
 
     def test_invalid_filter_exits(self):
         with pytest.raises(SystemExit):

@@ -31,13 +31,19 @@ Other key concepts:
 - **Snapshots** — historical time-series metrics for channels and videos (Firebolt)
 - **Reports** — saved report configurations that can be re-run
 - **Comments** — notes attached to sponsorships
-- **Send date** — the expected publication date for a sponsored video
+- **Sponsorship dates** — each sponsorship has four distinct dates, useful for different queries:
+  - **`created_at`** — when the sponsorship record was created in the system
+  - **`purchase_date`** — when the sponsorship was purchased (i.e. when the deal was made)
+  - **`send_date`** — the date the video is/was expected to be published (scheduled)
+  - **`publish_date`** — the date the video was actually published
 - **Credits** — every data query costs credits; use `tl describe` to see rates
 
 Users see data scoped by their organization and plan:
 - **Media buyers** see sponsorships where their org is the brand. They see `price` but never `cost`.
 - **Media sellers** see sponsorships where their org is the publisher. They see `cost` but never `price`.
 - **Intelligence plan** is required for `tl brands`, full channel search, and full uploads.
+
+When querying sponsorship bookings, query the date range by `purchase_date`, otherwise, query the date range by `publish_date`.
 
 ## Workflow
 
@@ -96,7 +102,7 @@ tl auth status                     # Auth check (free)
 ### Filter syntax
 All list commands accept `key:value` filters:
 ```bash
-tl sponsorships list status:sold brand:"Nike" since:2026-01
+tl sponsorships list status:sold brand:"Nike" purchase-date:2026-01
 tl uploads list channel:12345 type:longform
 tl channels list category:cooking min-subs:100k language:en
 ```
@@ -162,7 +168,7 @@ When presenting sponsorship status data, always use human-readable labels — ne
 
 "Show me my sold sponsorships this quarter":
 ```bash
-tl deals list since:2026-01-01 --json
+tl deals list purchase-date-start:2026-01-01 --json
 ```
 
 "What channels does Nike sponsor?":

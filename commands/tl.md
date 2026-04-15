@@ -17,7 +17,7 @@ The user wants to query ThoughtLeaders data. Translate their request into the ri
 
 ## Examples
 
-- "/tl sold sponsorships for Nike in Q1" → `tl sponsorships list status:sold brand:"Nike" since:2026-01-01 until:2026-03-31`
+- "/tl sold sponsorships for Nike in Q1" → `tl sponsorships list status:sold brand:"Nike" purchase-date-start:2026-01-01 purchase-date-end:2026-03-31`
 - "/tl cooking channels over 100k subs" → `tl channels list category:cooking min-subs:100000`
 - "/tl mobile-first US cooking channels" → `tl channels list category:cooking primary-device:mobile min-us-share:50`
 - "/tl Nike's sponsorship activity" → `tl brands show Nike`

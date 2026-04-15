@@ -58,13 +58,17 @@ All data commands use explicit subcommands: `list`, `show`, `create`/`add`. Runn
 ### Flexible filtering (all list commands)
 Filters are passed as `key:value` pairs after `list`:
 ```bash
-tl sponsorships list status:sold brand:"Nike" since:2026-01
-tl sponsorships list status:pending owner:emma limit:20
+tl sponsorships list status:sold brand:"Nike" purchase-date:2026-01
+tl sponsorships list status:pending send-date:2026-03
 tl uploads list channel:12345 type:longform since:2026-03
 tl channels list category:cooking min-subs:100k language:en
 ```
 
-Date filters (`since`, `until`, `send-date`, `send-date-before`, `publish-date`, `publish-date-before`) accept `today`, `yesterday`, and `tomorrow` as keywords — resolved to ISO dates on the CLI before sending to the server.
+Sponsorship date filtering (on `created-at`, `publish-date`, `purchase-date`, `send-date`) exposes three shapes per field:
+- `<field>:<date>` — matches rows within that date or period (e.g. `purchase-date:2026-03` = all of March 2026; `created-at:2026-03-15` = just that day).
+- `<field>-start:<date>` / `<field>-end:<date>` — inclusive lower/upper bounds for a range. Partial dates expand naturally (start → first of period, end → last).
+
+Ranges combine freely across fields (e.g. "created in Jan that published in March": `created-at:2026-01 publish-date:2026-03`). Uploads still use `since:` (publication date). All date filter keys accept `today`, `yesterday`, `tomorrow` as keywords — resolved to ISO dates on the CLI before sending to the server.
 
 ### Discoverability
 | Command | Description |
@@ -118,7 +122,7 @@ Schema metadata from server (`GET /api/cli/v1/describe/<resource>`) — always i
 
 | Command | Description |
 |---------|-------------|
-| `/tl <request>` | Smart router — Claude interprets the request and runs the right `tl` command(s). E.g., `/tl sold sponsorships for Nike in Q1` → `tl sponsorships status:sold brand:"Nike" since:2026-01-01 until:2026-03-31` |
+| `/tl <request>` | Smart router — Claude interprets the request and runs the right `tl` command(s). E.g., `/tl sold sponsorships for Nike in Q1` → `tl sponsorships status:sold brand:"Nike" purchase-date-start:2026-01-01 purchase-date-end:2026-03-31` |
 | `/tl-sponsorships [query]` | Quick sponsorship lookup. E.g., `/tl-sponsorships pending with send dates in April` |
 | `/tl-channels [query]` | Channel search. E.g., `/tl-channels cooking channels over 100k subs` |
 | `/tl-brands [query]` | Brand intelligence. E.g., `/tl-brands Nike` |
@@ -155,9 +159,9 @@ tools: [Bash, Read]
 
 What the agent does:
 - **Multi-step research**: "Find channels similar to the ones Nike sponsors and compare their pricing" → `tl brands show Nike --json` → extract channel IDs → `tl channels show <id> --json` for each → compile comparison table
-- **Cross-resource analysis**: "Show me deal slippage and add comments" → `tl sponsorships status:pending send-date:2026-03 --json` → identify slipping sponsorships → `tl comments add <id> "flagged for slippage"` for each
+- **Cross-resource analysis**: "Show me deal slippage and add comments" → `tl sponsorships status:pending send-date-end:2026-03 --json` → identify slipping sponsorships → `tl comments add <id> "flagged for slippage"` for each
 - **Report comparison**: "Compare my Q1 report to Q4" → `tl reports run <id> --since 2026-01 --until 2026-03 --json` → `tl reports run <id> --since 2025-10 --until 2025-12 --json` → synthesize
-- **Discovery workflows**: "What's my best performing brand this quarter" → `tl sponsorships status:sold since:2026-01 --json` → aggregate by brand → `tl brands show <top_brand> --json` → full picture
+- **Discovery workflows**: "What's my best performing brand this quarter" → `tl sponsorships status:sold purchase-date-start:2026-01 --json` → aggregate by brand → `tl brands show <top_brand> --json` → full picture
 - **Credit-aware**: checks balance before multi-query workflows, estimates total cost, asks user to confirm if expensive
 
 #### Hooks

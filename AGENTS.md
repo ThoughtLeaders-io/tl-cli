@@ -51,7 +51,7 @@ When adding a new data command, follow this pattern. See `sponsorships.py` for t
 
 ### Filter Parsing (`filters.py`)
 
-`parse_filters()` handles `key:value` and `key:"quoted value"` syntax. Returns `dict[str, str]` passed as query params. Date filter keys (`since`, `until`, `send-date`, etc.) accept keywords `today`, `yesterday`, `tomorrow`.
+`parse_filters()` handles `key:value` and `key:"quoted value"` syntax. Returns `dict[str, str]` passed as query params. Date filter keys (listed in `DATE_FILTER_KEYS` — e.g. `since`, `created-at`, `created-at-start`, `publish-date-end`) accept keywords `today`, `yesterday`, `tomorrow`. Sponsorship date fields (`created-at`, `publish-date`, `purchase-date`, `send-date`) each expose three filter shapes: bare `<field>:<date>` matches within that date/period, and `<field>-start:` / `<field>-end:` give inclusive lower/upper bounds (both sides inclusive; partial dates expand to the whole period).
 
 ### Auth Flow (`auth/`)
 
