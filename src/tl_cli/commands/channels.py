@@ -68,27 +68,53 @@ def list_cmd(
 
 @app.command("show")
 def show_cmd(
-    channel_id: int = typer.Argument(..., help="Channel ID"),
+    channel_ref: str = typer.Argument(..., help="Channel ID (numeric) or name (partial match, must be unique)"),
     json_output: bool = typer.Option(False, "--json", help="JSON output"),
     csv_output: bool = typer.Option(False, "--csv", help="CSV output (flattens adspots: one row per adspot)"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Raw JSON data only"),
 ) -> None:
-    """Show channel detail by ID (includes active adspots).
+    """Show channel detail by ID or name (includes active adspots).
+
+    Accepts either a numeric channel ID or a partial name. Names that
+    match more than one active channel return a 400 with the candidate
+    IDs listed so you can retry with a specific ID.
 
     Examples:
         tl channels show 12345
+        tl channels show "Economics Explained"
         tl channels show 12345 --csv > channel.csv
     """
     fmt = detect_format(json_output, csv_output, False, quiet)
 
+    encoded_ref = urllib.parse.quote(channel_ref, safe="")
     client = get_client()
     try:
-        data = client.get(f"/channels/{channel_id}")
+        data = client.get(f"/channels/{encoded_ref}")
         output_single(data, fmt)
     except ApiError as e:
-        handle_api_error(e)
+        _handle_channel_api_error(e)
     finally:
         client.close()
+
+
+def _handle_channel_api_error(e: ApiError) -> None:
+    """Print a candidates list for 400 responses with `candidates` in the
+    body (ambiguous channel name) and exit 1; otherwise defer to the
+    default handler. Used by both `show` and `similar` since they share
+    the server-side _resolve_channel helper and the same error shape.
+    """
+    if e.status_code == 400 and isinstance(e.raw, dict) and e.raw.get("candidates"):
+        err = Console(stderr=True)
+        err.print(f"[yellow]{e.detail}[/yellow]")
+        err.print()
+        err.print("[bold]Candidates:[/bold]")
+        err.print(f"  {'channel_id':>10}  {'subscribers':>12}  name")
+        err.print(f"  {'-' * 10}  {'-' * 12}  {'-' * 40}")
+        for c in e.raw["candidates"]:
+            subs = c.get("subscribers") or 0
+            err.print(f"  {c['channel_id']:>10}  {subs:>12,}  {c['name']}")
+        raise typer.Exit(1)
+    handle_api_error(e)
 
 
 def _format_score(results: list[dict]) -> list[dict]:
@@ -151,19 +177,7 @@ def _do_similar(channel_ref: str, args: list[str], fmt: str, limit: int) -> None
             column_config=SIMILAR_COLUMN_CONFIG,
         )
     except ApiError as e:
-        # Ambiguous-name resolution: server returns 400 with candidates.
-        if e.status_code == 400 and isinstance(e.raw, dict) and e.raw.get("candidates"):
-            err = Console(stderr=True)
-            err.print(f"[yellow]{e.detail}[/yellow]")
-            err.print()
-            err.print("[bold]Candidates:[/bold]")
-            err.print(f"  {'channel_id':>10}  {'subscribers':>12}  name")
-            err.print(f"  {'-' * 10}  {'-' * 12}  {'-' * 40}")
-            for c in e.raw["candidates"]:
-                subs = c.get("subscribers") or 0
-                err.print(f"  {c['channel_id']:>10}  {subs:>12,}  {c['name']}")
-            raise typer.Exit(1)
-        handle_api_error(e)
+        _handle_channel_api_error(e)
     finally:
         client.close()
 

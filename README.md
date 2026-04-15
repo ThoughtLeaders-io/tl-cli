@@ -57,13 +57,17 @@ tl uploads show 1174310:0BehkmVa7ak
 # Search channels
 tl channels list category:cooking min-subs:100k
 
-# Show channel detail
+# Show channel detail — accepts numeric ID or channel name.
+# Names that match more than one active channel print a candidate list
+# and exit; retry with a specific ID.
 tl channels show 12345
+tl channels show "Economics Explained"
 
 # Find similar channels (vector recommender, 50 credits, Intelligence plan).
 # MSN filtering is on by default — pass msn:false to include non-MSN channels.
+# Same ID-or-name resolution rules as `channels show`.
 tl channels similar 12345 --limit 10
-tl channels similar "Economics Explained" min-score:0.85 --limit 5
+tl channels similar "Tremending girls" min-score:0.85 --limit 5
 
 # Brand intelligence
 tl brands show Nike
