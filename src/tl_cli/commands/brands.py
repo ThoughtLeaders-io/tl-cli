@@ -107,7 +107,7 @@ def history_cmd(
         output(
             data,
             fmt,
-            columns=["video_id", "title", "channel", "channel_name", "views", "publication_date", "type"],
+            columns=["video_id", "title", "channel_id", "channel", "views", "publication_date", "type"],
             title=f"Brand History: {brand_name}",
         )
     except ApiError as e:
