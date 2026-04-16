@@ -88,3 +88,7 @@ The version string is defined in three files and all three must be updated toget
 # Git commit rules
 
 Do not reference internal architecture of the ThoughtLeaders app in commit messages.
+
+# Be aware of tests
+
+Be sure to check if tests need to be updated when changing any data structures or function names, in all repos involved in the change.
