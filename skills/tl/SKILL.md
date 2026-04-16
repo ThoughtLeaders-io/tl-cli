@@ -96,8 +96,9 @@ tl uploads show <id>                   # Upload detail (2 credits)
 tl channels list [filters...]          # Channel search (3 credits/result, 5/detail)
 tl channels show <id-or-name>          # Channel detail (accepts numeric ID or channel name)
 tl channels similar <id-or-name>       # Vector-similarity recommender (50 credits; Intelligence plan)
-tl brands show <query>                 # Brand intelligence (5 credits/result, 8/detail)
-tl brands show <query> --channel <id>  # Brand mentions on specific channel
+tl brands show <id-or-name>            # Brand detail (8 credits; accepts numeric ID or name)
+tl brands history <id-or-name>         # Sponsorship history — videos where brand was detected (5 credits/result)
+tl brands history <query> --channel <id>  # Brand mentions on specific channel
 tl snapshots channel <id>              # Channel metrics over time (1 credit/point)
 tl snapshots video <id> --channel <id> # Video view curve (1 credit/point, --channel required!)
 tl reports                             # List saved reports (free)
@@ -209,7 +210,7 @@ tl deals list purchase-date-start:2026-01-01 --json
 
 "What channels does Nike sponsor?":
 ```bash
-tl brands show Nike --json
+tl brands history Nike --json
 ```
 
 "Compare view curves for two videos":
