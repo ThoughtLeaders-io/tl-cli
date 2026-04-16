@@ -5,14 +5,12 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from tl_cli import config as tl_config
 from tl_cli.client.errors import handle_api_error, ApiError
 from tl_cli.client.http import get_client
 from tl_cli.filters import parse_filters
 from tl_cli.output.formatter import detect_format, output, output_single
 
-COLUMNS = ["id", "created_at", "brand_id", "brand", "channel_id", "channel", "article_id", "views", "status", "price", "cpm", "owner_sales_email"]
-COLUMNS_FULL_ACCESS = ["id", "created_at", "brand_id", "brand", "channel_id", "channel", "article_id", "views", "status", "price", "cost", "cpm", "owner_sales_email"]
+COLUMNS = ["id", "created_at", "brand_id", "brand", "channel_id", "channel", "article_id", "views", "status", "price", "cost", "cpm", "owner_sales_email"]
 COLUMN_CONFIG = {
     "price": {"justify": "right"},
     "cost": {"justify": "right"},
@@ -74,8 +72,7 @@ def do_list(
         data = client.get("/sponsorships", params=params)
         if "results" in data:
             data["results"] = _format_results(data["results"])
-        columns = COLUMNS_FULL_ACCESS if tl_config.full_access else COLUMNS
-        output(data, fmt, columns=columns, title=title, column_config=COLUMN_CONFIG)
+        output(data, fmt, columns=COLUMNS, title=title, column_config=COLUMN_CONFIG)
     except ApiError as e:
         handle_api_error(e)
     finally:

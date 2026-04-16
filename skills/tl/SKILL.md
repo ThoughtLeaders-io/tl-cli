@@ -64,8 +64,6 @@ An obsolete name for "sponsorship" is an "adlink".
 
 At the start of session, always run a `tl help` command to find out which commands are available, and the `tl whoami` command to find out what you have access to.
 
-If the user has the `full_access` permission, always use the `--full-access` command line parameter as the very first parameter to the `tl` executable.
-
 Unless the user specifically asks for running a specific report or showing the result of a specific report, find the data by using other, low-level commands.
 
 1. **Discover first**: Run `tl describe show <resource> --json` to learn available fields, filters, and credit costs before querying

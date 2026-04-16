@@ -42,7 +42,6 @@ class Config:
 
 # Global flags, set by options on the root command
 debug: bool = False
-full_access: bool = False
 
 
 def get_config() -> Config:

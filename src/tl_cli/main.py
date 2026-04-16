@@ -57,13 +57,9 @@ def main(
     debug: bool = typer.Option(
         False, "--debug", help="Show detailed error information",
     ),
-    full_access: bool = typer.Option(
-        False, "--full-access", help="Show all data across all brands and channels (requires permission)",
-    ),
 ) -> None:
     """ThoughtLeaders CLI."""
     tl_config.debug = debug
-    tl_config.full_access = full_access
 
     # Skip hints/warnings for setup commands
     import sys
