@@ -2,30 +2,6 @@
 
 **tl-cli** is a Python CLI for querying ThoughtLeaders sponsorship data (sponsorships, channels, brands, uploads, snapshots, reports). Built with Typer + Rich + httpx. Designed as an "agent-first tool" — the CLI handles structured commands and output, while the user's AI agent (Claude) provides intelligence.
 
-# Development Commands
-
-```bash
-# Setup
-python -m venv .venv && source .venv/bin/activate
-pip install -e .                    # Editable install (registers `tl` command)
-
-# Test
-pytest                              # All tests
-pytest tests/test_auth.py           # Single file
-pytest tests/test_filters.py -k "test_quoted"  # Single test by name
-
-# Lint
-ruff check src/ tests/              # Lint (rules: E, F, I, W)
-ruff format --check src/ tests/     # Format check
-ruff check --fix src/ tests/        # Auto-fix
-
-# Run
-tl --help                           # CLI entry point
-tl describe --json                  # Schema discovery (free, no auth needed for structure)
-```
-
-Ruff config: Python 3.10 target, 100-char line length.
-
 # Architecture
 
 ## Entry Point & Command Registration
@@ -37,9 +13,8 @@ Ruff config: Python 3.10 target, 100-char line length.
 Every data command in `src/tl_cli/commands/` uses explicit Typer subcommands:
 - `list` — list/search with `key:value` filters as positional args
 - `show` — detail view by ID
+- `history` — historical data list
 - `create` / `add` — create new records (where applicable)
-
-Running a command with no subcommand defaults to `list`. Shared logic for sponsorship commands lives in `sponsorships.py` (`do_list`, `do_show`, `do_create`).
 
 When adding a new data command, follow this pattern. See `sponsorships.py` for the reference implementation.
 
@@ -47,7 +22,7 @@ When adding a new data command, follow this pattern. See `sponsorships.py` for t
 
 ## Filter Parsing (`filters.py`)
 
-`parse_filters()` handles `key:value` and `key:"quoted value"` syntax. Returns `dict[str, str]` passed as query params. Date filter keys (listed in `DATE_FILTER_KEYS` — e.g. `since`, `created-at`, `created-at-start`, `publish-date-end`) accept keywords `today`, `yesterday`, `tomorrow`. Sponsorship date fields (`created-at`, `publish-date`, `purchase-date`, `send-date`) each expose three filter shapes: bare `<field>:<date>` matches within that date/period, and `<field>-start:` / `<field>-end:` give inclusive lower/upper bounds (both sides inclusive; partial dates expand to the whole period).
+`parse_filters()` handles `key:value` and `key:"quoted value"` syntax. Returns `dict[str, str]` passed as query params. Date filter keys (listed in `DATE_FILTER_KEYS` — e.g. `since`, `created-at`, `created-at-start`, `publish-date-end`) accept keywords `today`, `yesterday`, `tomorrow`. Sponsorship date fields (`created-at`, `publish-date`, `purchase-date`, `send-date`) each expose three filter shapes: bare `<field>:<date>` matches within that date/period, and `<field>-start:` / `<field>-end:` give inclusive lower/upper bounds (both sides inclusive; partial dates expand to the whole period). Empty-string values result in `IS NULL` queries on the backend.
 
 ## Auth Flow (`auth/`)
 
@@ -104,3 +79,12 @@ The version string is defined in three files and all three must be updated toget
 ## Important Constraint
 
 `tl snapshots video` requires `--channel` flag — Firebolt queries without a channel partition are unbounded.
+
+## Coding
+
+* Do not reference internal architecture of the ThoughtLeaders app in comments.
+* Place all imports at the start of the Python module file
+
+# Git commit rules
+
+Do not reference internal architecture of the ThoughtLeaders app in commit messages.
