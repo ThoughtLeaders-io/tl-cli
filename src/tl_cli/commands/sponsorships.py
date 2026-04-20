@@ -11,7 +11,7 @@ from tl_cli.filters import parse_filters
 from tl_cli.hints import detail_hint
 from tl_cli.output.formatter import detect_format, output, output_single
 
-COLUMNS = ["id", "created_at", "brand_id", "brand", "channel_id", "channel", "article_id", "views", "status", "price", "cost", "cpm", "owner_sales_email"]
+COLUMNS = ["sponsorship_id", "created_at", "brand_id", "brand", "channel_id", "channel", "article_id", "views", "status", "price", "cost", "cpm", "owner_sales_email"]
 COLUMN_CONFIG = {
     "price": {"justify": "right"},
     "cost": {"justify": "right"},
@@ -73,6 +73,8 @@ def do_list(
         data = client.get("/sponsorships", params=params)
         if "results" in data:
             data["results"] = _format_results(data["results"])
+            for r in data["results"]:
+                r["sponsorship_id"] = r.pop("id", None)
         output(data, fmt, columns=COLUMNS, title=title, column_config=COLUMN_CONFIG)
     except ApiError as e:
         handle_api_error(e)
@@ -85,6 +87,8 @@ def do_show(item_id: str, fmt: str) -> None:
     client = get_client()
     try:
         data = client.get(f"/sponsorships/{item_id}")
+        for r in (data.get("results", []) if isinstance(data.get("results"), list) else []):
+            r["sponsorship_id"] = r.pop("id", None)
         output_single(data, fmt)
         if fmt == "table" and data.get("show_cta"):
             record = data.get("results", data)

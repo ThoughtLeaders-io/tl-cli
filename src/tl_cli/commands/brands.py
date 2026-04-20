@@ -57,6 +57,8 @@ def show_cmd(
     client = get_client()
     try:
         data = client.get(f"/brands/{encoded_query}")
+        for r in (data.get("results", []) if isinstance(data.get("results"), list) else []):
+            r["brand_id"] = r.pop("id", None)
         output_single(data, fmt)
         if fmt == "table" and data.get("show_cta"):
             record = data.get("results", data)

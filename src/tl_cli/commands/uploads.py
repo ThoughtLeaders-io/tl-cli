@@ -39,10 +39,12 @@ def list_cmd(
     try:
         params = {**filters, "limit": str(limit), "offset": str(offset)}
         data = client.get("/uploads", params=params)
+        for r in data.get("results", []):
+            r["upload_id"] = r.pop("id", None)
         output(
             data,
             fmt,
-            columns=["id", "title", "channel", "views", "publication_date", "content_type"],
+            columns=["upload_id", "title", "channel", "views", "publication_date", "content_type"],
             title="Uploads",
         )
     except ApiError as e:
@@ -71,6 +73,8 @@ def show_cmd(
     try:
         for upload_id in ids:
             data = client.get(f"/uploads/{upload_id}")
+            for r in (data.get("results", []) if isinstance(data.get("results"), list) else []):
+                r["upload_id"] = r.pop("id", None)
             output_single(data, fmt)
     except ApiError as e:
         handle_api_error(e)

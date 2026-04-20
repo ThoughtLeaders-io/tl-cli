@@ -15,7 +15,7 @@ app = typer.Typer(help="YouTube channels (search, detail, and similar-channel re
 
 # Columns for the `similar` endpoint result table. The server enriches every
 # row so the user can size up each suggestion without follow-up queries.
-SIMILAR_COLUMNS = ["score", "id", "name", "msn", "tpp", "subscribers", "projected_views", "total_views", "cpm", "audience"]
+SIMILAR_COLUMNS = ["score", "channel_id", "name", "msn", "tpp", "subscribers", "projected_views", "total_views", "cpm", "audience"]
 SIMILAR_COLUMN_CONFIG = {
     "score": {"justify": "right"},
     "subscribers": {"justify": "right"},
@@ -54,10 +54,12 @@ def list_cmd(
     try:
         params = {**filters, "limit": str(limit), "offset": str(offset)}
         data = client.get("/channels", params=params)
+        for r in data.get("results", []):
+            r["channel_id"] = r.pop("id", None)
         output(
             data,
             fmt,
-            columns=["id", "name", "msn", "tpp", "subscribers", "category", "sponsorship_score", "trend"],
+            columns=["channel_id", "name", "msn", "tpp", "subscribers", "category", "sponsorship_score", "trend"],
             title="Channels",
         )
     except ApiError as e:
@@ -89,6 +91,8 @@ def show_cmd(
     client = get_client()
     try:
         data = client.get(f"/channels/{encoded_ref}")
+        for r in (data.get("results", []) if isinstance(data.get("results"), list) else []):
+            r["channel_id"] = r.pop("id", None)
         output_single(data, fmt)
         if fmt == "table" and data.get("show_cta"):
             record = data.get("results", data)
@@ -174,6 +178,8 @@ def _do_similar(channel_ref: str, args: list[str], fmt: str, limit: int) -> None
             results = [r for r in results if r.get("id") not in excluded]
 
         data["results"] = results
+        for r in data["results"]:
+            r["channel_id"] = r.pop("id", None)
         if fmt in ("table", "md"):
             _format_score(data["results"])
         output(

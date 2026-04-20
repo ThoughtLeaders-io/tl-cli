@@ -42,10 +42,12 @@ def reports(
     client = get_client()
     try:
         data = client.get("/reports")
+        for r in data.get("results", []):
+            r["report_id"] = r.pop("id", None)
         output(
             data,
             fmt,
-            columns=["id", "title", "report_type", "created_by", "updated_at"],
+            columns=["report_id", "title", "report_type", "created_by", "updated_at"],
             title="Saved Reports",
         )
     except ApiError as e:

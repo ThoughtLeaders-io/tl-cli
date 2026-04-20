@@ -24,10 +24,12 @@ def list_cmd(
     client = get_client()
     try:
         data = client.get(f"/comments/{adlink_id}")
+        for r in data.get("results", []):
+            r["comment_id"] = r.pop("id", None)
         output(
             data,
             fmt,
-            columns=["id", "author", "text", "created_at"],
+            columns=["comment_id", "author", "text", "created_at"],
             title=f"Comments on Sponsorship #{adlink_id}",
         )
     except ApiError as e:
