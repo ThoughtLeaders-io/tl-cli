@@ -19,7 +19,7 @@ def uploads(ctx: typer.Context) -> None:
 
 @app.command("list")
 def list_cmd(
-    args: list[str] = typer.Argument(None, help="Filters (key:value pairs)"),
+    args: list[str] = typer.Argument(None, help="Filters (key:value pairs). Run 'tl describe show uploads' for available filters."),
     json_output: bool = typer.Option(False, "--json", help="JSON output"),
     csv_output: bool = typer.Option(False, "--csv", help="CSV output"),
     md_output: bool = typer.Option(False, "--md", help="Markdown output"),

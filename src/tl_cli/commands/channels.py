@@ -34,7 +34,7 @@ def channels(ctx: typer.Context) -> None:
 
 @app.command("list")
 def list_cmd(
-    args: list[str] = typer.Argument(None, help="Filters (key:value pairs)"),
+    args: list[str] = typer.Argument(None, help="Filters (key:value pairs). Run 'tl describe show channels' for available filters."),
     json_output: bool = typer.Option(False, "--json", help="JSON output"),
     csv_output: bool = typer.Option(False, "--csv", help="CSV output"),
     md_output: bool = typer.Option(False, "--md", help="Markdown output"),
@@ -198,7 +198,7 @@ def _do_similar(channel_ref: str, args: list[str], fmt: str, limit: int) -> None
 @app.command("similar")
 def similar_cmd(
     channel_ref: str = typer.Argument(..., help="Channel ID (numeric) or name (partial match, must be unique)"),
-    args: list[str] = typer.Argument(None, help="Filters (key:value pairs)"),
+    args: list[str] = typer.Argument(None, help="Filters (key:value pairs). Run 'tl describe show channels' for available filters."),
     json_output: bool = typer.Option(False, "--json", help="JSON output"),
     csv_output: bool = typer.Option(False, "--csv", help="CSV output"),
     md_output: bool = typer.Option(False, "--md", help="Markdown output"),
@@ -269,7 +269,7 @@ def history_cmd(
 @app.command("look-alike", hidden=True)
 def look_alike_cmd(
     channel_ref: str = typer.Argument(..., help="Channel ID or name"),
-    args: list[str] = typer.Argument(None, help="Filters (key:value pairs)"),
+    args: list[str] = typer.Argument(None, help="Filters (key:value pairs). Run 'tl describe show channels' for available filters."),
     json_output: bool = typer.Option(False, "--json", help="JSON output"),
     csv_output: bool = typer.Option(False, "--csv", help="CSV output"),
     md_output: bool = typer.Option(False, "--md", help="Markdown output"),
