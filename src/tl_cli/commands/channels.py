@@ -59,7 +59,7 @@ def list_cmd(
         output(
             data,
             fmt,
-            columns=["channel_id", "name", "url", "msn", "tpp", "subscribers", "category", "sponsorship_score", "trend"],
+            columns=["channel_id", "name", "url", "msn", "tpp", "subscribers", "gender", "countries", "category", "sponsorship_score", "trend"],
             title="Channels",
         )
     except ApiError as e:

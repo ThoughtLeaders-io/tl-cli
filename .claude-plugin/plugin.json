@@ -1,6 +1,6 @@
 {
   "name": "tl-cli",
-  "version": "0.4.11",
+  "version": "0.4.12",
   "description": "ThoughtLeaders CLI — query sponsorship deals, channels, brands, uploads, and intelligence from the terminal",
   "author": {
     "name": "ThoughtLeaders",
