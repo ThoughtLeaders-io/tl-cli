@@ -61,6 +61,7 @@ def run_report(
     report_id: int = typer.Argument(..., help="Report ID to execute"),
     since: str | None = typer.Option(None, "--since", help="Override start date"),
     until: str | None = typer.Option(None, "--until", help="Override end date"),
+    columns: str | None = typer.Option(None, "--columns", help="Comma-separated list of columns to display (overrides defaults)"),
     json_output: bool = typer.Option(False, "--json", help="JSON output"),
     csv_output: bool = typer.Option(False, "--csv", help="CSV output"),
     md_output: bool = typer.Option(False, "--md", help="Markdown output"),
@@ -74,6 +75,7 @@ def run_report(
     Examples:
         tl reports run 789
         tl reports run 789 --since 2026-01-01 --json
+        tl reports run 789 --columns brand_id,name,views_sum,channel_count
     """
     fmt = detect_format(json_output, csv_output, md_output)
 
@@ -86,7 +88,22 @@ def run_report(
     client = get_client()
     try:
         data = client.get(f"/reports/{report_id}/run", params=params)
-        output(data, fmt, title=f"Report #{report_id}")
+
+        # Build title from report metadata
+        report_title = data.get("report_title", "")
+        report_type = data.get("report_type", "")
+        title = f"Report #{report_id}"
+        if report_title:
+            title = f"{report_title} (#{report_id})"
+
+        # Column selection priority: --columns flag > server display_columns > auto-detect
+        col_list = None
+        if columns:
+            col_list = [c.strip() for c in columns.split(",") if c.strip()]
+        elif data.get("display_columns"):
+            col_list = data["display_columns"]
+
+        output(data, fmt, columns=col_list, title=title)
     except ApiError as e:
         handle_api_error(e)
     finally:

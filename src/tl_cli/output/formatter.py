@@ -62,12 +62,14 @@ def output(
     if columns is None:
         columns = _auto_columns(results)
 
+    column_types = data.get("column_types")
+
     if fmt == "csv":
         _output_csv(results, columns)
     elif fmt == "md":
-        _output_markdown(results, columns)
+        _output_markdown(results, columns, column_types)
     else:
-        _output_table(results, columns, title, total, column_config)
+        _output_table(results, columns, title, total, column_config, column_types)
 
     _print_pagination_notice(data)
     _print_usage(usage)
@@ -113,20 +115,120 @@ def _auto_columns(results: list[dict]) -> list[str]:
     return keys[:8]
 
 
+_NUMERIC_DATA_TYPES = {"number", "num_days", "currency"}
+
+
+def _resolve_numeric_columns(
+    results: list[dict],
+    columns: list[str],
+    column_types: dict[str, str] | None = None,
+) -> set[str]:
+    """Determine which columns are numeric using server metadata first,
+    then auto-detection from values as a fallback."""
+    if column_types:
+        known = {col for col in columns if column_types.get(col) in _NUMERIC_DATA_TYPES}
+        # For columns not in column_types, fall back to auto-detection
+        unknown = [col for col in columns if col not in column_types]
+        if unknown:
+            known |= _detect_numeric_columns(results, unknown)
+        return known
+    return _detect_numeric_columns(results, columns)
+
+
+def _detect_numeric_columns(results: list[dict], columns: list[str]) -> set[str]:
+    """Scan result rows to find columns where all non-None values are numeric.
+
+    Handles int, float, and string representations of numbers (e.g. Django
+    DecimalField values serialized as "1437.50").
+    """
+    numeric = set(columns)
+    for row in results[:50]:  # sample first 50 rows
+        for col in list(numeric):
+            val = row.get(col)
+            if val is None or val == "":
+                continue
+            if isinstance(val, bool):
+                numeric.discard(col)
+            elif isinstance(val, (int, float)):
+                continue
+            elif isinstance(val, str):
+                try:
+                    float(val)
+                except (ValueError, OverflowError):
+                    numeric.discard(col)
+            else:
+                numeric.discard(col)
+    # Don't treat ID-like columns as numeric
+    for col in list(numeric):
+        if col.endswith("_id") or col == "id" or "publication" in col:
+            numeric.discard(col)
+    # Columns where every sampled value was None/empty aren't meaningfully numeric
+    for col in list(numeric):
+        if not any(row.get(col) not in (None, "") for row in results[:50]):
+            numeric.discard(col)
+    return numeric
+
+
+def _format_numeric(val: object, decimals: bool = False, currency: bool = False) -> str:
+    """Format a numeric value for table display.
+
+    Args:
+        decimals: If True, always show 2 decimal places (column has fractional values).
+        currency: If True, prefix with '$ '.
+    """
+    if val is None or val == "":
+        return ""
+    if isinstance(val, bool):
+        return str(val)
+    # Coerce to float for uniform handling
+    try:
+        f = float(val)
+    except (ValueError, TypeError, OverflowError):
+        return str(val)
+    if decimals or currency:
+        text = f"{f:,.2f}"
+    else:
+        text = f"{int(f):,}" if f == int(f) else f"{f:,.2f}"
+    if currency:
+        text = f"$ {text}"
+    return text
+
+
+def _column_has_decimals(results: list[dict], col: str) -> bool:
+    """Check if any non-None value in a column has a fractional part."""
+    for row in results[:100]:
+        val = row.get(col)
+        if val is None or val == "":
+            continue
+        try:
+            f = float(val)
+            if f != int(f):
+                return True
+        except (ValueError, TypeError, OverflowError):
+            pass
+    return False
+
+
 def _output_table(
     results: list[dict],
     columns: list[str],
     title: str | None,
     total: int | None,
     column_config: dict[str, dict] | None = None,
+    column_types: dict[str, str] | None = None,
 ) -> None:
     """Rich table output for TTY.
 
     column_config maps column names to kwargs passed to table.add_column(),
     e.g. {"price": {"justify": "right"}}.
+    Numeric columns are determined from server-provided column_types first,
+    then auto-detected from values as a fallback.
     """
     console = Console()
     column_config = column_config or {}
+    numeric_cols = _resolve_numeric_columns(results, columns, column_types)
+    col_decimals = {col: _column_has_decimals(results, col) for col in numeric_cols}
+    col_currency = {col for col in columns if (column_types or {}).get(col) == "currency"}
     header = title or "Results"
     if total is not None:
         header += f" ({len(results)} of {total})"
@@ -134,10 +236,19 @@ def _output_table(
     table = Table(title=header, show_lines=False)
     for col in columns:
         extra = column_config.get(col, {})
+        if col in numeric_cols and "justify" not in extra:
+            extra = {**extra, "justify": "right"}
         table.add_column(col, overflow="ellipsis", max_width=40, **extra)
 
     for row in results:
-        table.add_row(*[_truncate(str(row.get(col, "")), 40) for col in columns])
+        cells = []
+        for col in columns:
+            val = row.get(col, "")
+            if col in numeric_cols:
+                cells.append(_format_numeric(val, decimals=col_decimals.get(col, False), currency=col in col_currency))
+            else:
+                cells.append(_truncate(str(val), 40))
+        table.add_row(*cells)
 
     console.print(table)
 
@@ -150,14 +261,24 @@ def _output_csv(results: list[dict], columns: list[str]) -> None:
         writer.writerow({k: row.get(k, "") for k in columns})
 
 
-def _output_markdown(results: list[dict], columns: list[str]) -> None:
+def _output_markdown(results: list[dict], columns: list[str], column_types: dict[str, str] | None = None) -> None:
     """Markdown table output."""
+    numeric_cols = _resolve_numeric_columns(results, columns, column_types)
+    col_decimals = {col: _column_has_decimals(results, col) for col in numeric_cols}
+    col_currency = {col for col in columns if (column_types or {}).get(col) == "currency"}
     # Header
     print("| " + " | ".join(columns) + " |")
-    print("| " + " | ".join(["---"] * len(columns)) + " |")
+    alignments = ["---:" if col in numeric_cols else "---" for col in columns]
+    print("| " + " | ".join(alignments) + " |")
     # Rows
     for row in results:
-        values = [str(row.get(col, "")) for col in columns]
+        values = []
+        for col in columns:
+            val = row.get(col, "")
+            if col in numeric_cols:
+                values.append(_format_numeric(val, decimals=col_decimals.get(col, False), currency=col in col_currency))
+            else:
+                values.append(str(val).replace("\n", " ").replace("|", "\\|"))
         print("| " + " | ".join(values) + " |")
 
 
