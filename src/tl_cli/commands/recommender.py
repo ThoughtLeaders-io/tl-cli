@@ -154,7 +154,7 @@ def top_channels_cmd(
     _do_top("channels", tag, args or [], fmt, limit, TOP_CHANNEL_COLUMNS, f"Top channels: {tag}")
 
 
-@app.command("top-profiles")
+@app.command("top-profiles", hidden=True)  # full-access only on the server; not part of the public surface
 def top_profiles_cmd(
     tag: str = typer.Argument(..., help='Similarity tag name (e.g. "Cooking", "Age 18-24"). Run `tl recommender tags` to discover valid names.'),
     args: list[str] = typer.Argument(None, help="Filters (key:value pairs)."),

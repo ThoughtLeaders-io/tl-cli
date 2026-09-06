@@ -124,7 +124,7 @@ When querying sponsorship bookings, filter the rows with `publish_status = 3` (s
 
 Where possible, if searching for a sponsorship match between channels and brands, first search for what do similar brands sponsor / which brands is the channel usually sponsored by. The similarity judgement should be preferably based on similar topics, similar upload frequency, similar channel sizes, and only after all that, on demographics.
 
-Use the `tl channels similar` and `tl brands similar` commands to find channels or brands similar to a particular channel or brand. For category- or topic-driven discovery (e.g. "Find me Cooking channels", "Who scores high on USA share?"), use `tl recommender top-channels "<tag>"` (or `top-brands`/`top-profiles`) against the recommender — that's faster, ranked by category-strength. Run `tl recommender tags` to discover the valid tag names.
+Use the `tl channels similar` and `tl brands similar` commands to find channels or brands similar to a particular channel or brand. For category- or topic-driven discovery (e.g. "Find me Cooking channels", "Who scores high on USA share?"), use `tl recommender top-channels "<tag>"` (or `top-brands`) against the recommender — that's faster, ranked by category-strength. Run `tl recommender tags` to discover the valid tag names.
 
 ## Workflow
 
@@ -205,7 +205,6 @@ tl brands find <query>                 # Resolve a string to {id, name}; matches
 tl brands similar <id-or-name>         # Find similar brands via similarity search
 tl recommender tags [query]            # List similarity tag names — categories, demographics, formats
 tl recommender top-channels "<tag>"    # Top channels loaded on a similarity tag (Intelligence)
-tl recommender top-profiles "<tag>"    # Top brand profiles loaded on a similarity tag
 tl recommender top-brands "<tag>"      # Top brands (deduped from profiles) loaded on a similarity tag
 tl recommender channels-with-tag "<tag>" [--min <v>] # ALL channel IDs scoring >= v on a tag (--min default 0.00001 drops zero-loading channels; paged, enumerates the full set; 1 credit/result; Intelligence)
 tl recommender inspect-channel <ref>   # Show a channel's similarity-profile breakdown (Intelligence)
@@ -611,7 +610,6 @@ tl recommender top-brands "USA share" mbn:yes --limit 50
 | Command | Filters |
 | --- | --- |
 | `top-channels` | `msn:<yes\|no\|all>` (default all), `exclude-for-profile:<id>` |
-| `top-profiles` | `mbn:<yes\|no\|all>` (default all), `exclude-for-channel:<id>` |
 | `top-brands` | `mbn:<yes\|no\|all>` (default all) |
 | `channels-for-profile` | `language:<iso>` (default `en`), `msn:<yes\|no>` (default `no`) |
 | `channels-for-brand` | same as `channels-for-profile` |
@@ -887,7 +885,6 @@ tl channels similar 29834 min-subs:1000000 exclude:477487 --limit 15  # client-s
 tl recommender tags                                            # Full tag list (free)
 tl recommender tags cooking                                    # Search tag names by substring
 tl recommender top-channels "Cooking" msn:yes --limit 50       # Top channels loaded on a tag (25 credits)
-tl recommender top-profiles "Cooking" --limit 30               # Top brand profiles for the tag
 tl recommender top-brands "USA share" mbn:yes --limit 30       # Top brands (deduped) — demographic tag, MBN only
 tl recommender top-channels "Tech" exclude-for-profile:842     # Drop channels already proposed for profile 842
 tl recommender inspect-channel 29834                           # Per-tag breakdown of a channel's vector
