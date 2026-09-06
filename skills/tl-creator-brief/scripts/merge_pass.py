@@ -90,6 +90,27 @@ from ledger_io import read_ledger, write_ledger  # noqa: E402
 
 DOMAINS = {"origin", "family", "pets", "home", "work", "money", "health",
            "habits", "tastes", "beliefs", "relationships", "other"}
+# The socials lane writes its own `facts` records rather than judging clusters,
+# so it reaches for domain words the enum does not carry ("hobbies", "gear").
+# Measured on a live run: 5 of 9 identity facts used a near-miss label and the
+# whole expand failed, costing a hand-written patch. These are the near-misses
+# with exactly one sensible target; anything else still fails loudly with the
+# allowed list. The aliasing is reported, never silent.
+DOMAIN_ALIASES = {
+    "hobbies": "habits", "hobby": "habits", "interests": "habits",
+    "routine": "habits", "routines": "habits",
+    # An ambiguous label lands in the enum's own catch-all rather than a
+    # guessed specific domain: "other" is honest, a wrong "work" is not.
+    "identity": "other", "personal": "other", "misc": "other",
+    "gear": "other", "stuff": "other",
+    "career": "work", "job": "work", "business": "work",
+    "location": "home", "residence": "home",
+    "fitness": "health", "wellness": "health",
+    "food": "tastes", "preferences": "tastes",
+    "partner": "relationships", "marriage": "relationships",
+    "childhood": "origin", "background": "origin",
+    "finances": "money",
+}
 SENSITIVITY = {"none", "lifestyle", "clinical", "children", "location"}
 WITHHELD = {"clinical", "children", "location"}
 CONFIDENCE = {"confirmed", "unconfirmed"}
@@ -440,13 +461,23 @@ def load_decisions(paths: list[str]) -> tuple[dict[str, dict], list[str],
                                               list[dict], list[str]]:
     """Merge the decision files. Later files override earlier ones per id,
     which is what makes the exit-3 re-ask a small patch instead of a rewrite.
-    ``selected`` and the identity-lane ``facts`` list are whole-document
-    fields: a later file that carries one replaces it, a file that omits it
-    leaves the earlier answer standing."""
+
+    ``selected`` is a **union** across files, in first-seen order, because a
+    sharded merge returns one file per shard and each shard can only nominate
+    from the domains it saw: replacing would let the last shard read silently
+    decide the whole page. ``expand`` still owns the final count.
+
+    The identity-lane ``facts`` list stays a whole-document field, so a later
+    file that carries one replaces it and a file that omits it leaves the
+    earlier answer standing. An explicitly empty ``facts`` is a violation
+    rather than a silent wipe of the lane, and a file that changes nothing at
+    all is a violation too: a patch that no-ops is the failure mode that
+    costs a stage a manual diagnosis."""
     decisions: dict[str, dict] = {}
     selected: list[str] = []
     identity: list[dict] = []
     problems: list[str] = []
+    identity_seen = False
     for p in paths:
         path = pathlib.Path(p)
         raw = re.sub(r"^```(?:json)?\s*|\s*```$", "",
@@ -463,21 +494,57 @@ def load_decisions(paths: list[str]) -> tuple[dict[str, dict], list[str],
         if not isinstance(got, dict):
             problems.append(f"{path.name}: no `decisions` object")
             continue
+        touched = False
         for key, value in got.items():
             if not isinstance(value, dict):
                 problems.append(f"{path.name}: decision for {key} is not an object")
                 continue
             decisions[str(key)] = value
+            touched = True
         if isinstance(data.get("selected"), list):
-            selected = [str(x) for x in data["selected"]]
+            for x in data["selected"]:
+                if str(x) not in selected:
+                    selected.append(str(x))
+            touched = True
         if "facts" in data:
-            if isinstance(data["facts"], list):
+            if not isinstance(data["facts"], list):
+                problems.append(f"{path.name}: `facts` is not a list")
+            elif not data["facts"] and identity_seen:
+                problems.append(
+                    f"{path.name}: `facts` is empty, which would drop the "
+                    f"{len(identity)} identity-lane fact(s) an earlier file "
+                    "carried; omit the key to leave them standing")
+            else:
                 identity = [x for x in data["facts"] if isinstance(x, dict)]
                 if len(identity) != len(data["facts"]):
                     problems.append(f"{path.name}: a `facts` entry is not an object")
-            else:
-                problems.append(f"{path.name}: `facts` is not a list")
+                identity_seen = True
+                touched = True
+        if not touched:
+            problems.append(
+                f"{path.name}: carries no decisions, no `selected` and no "
+                "`facts`, so it changes nothing; a patch file must say what "
+                "it is patching")
     return decisions, selected, identity, problems
+
+
+def alias_identity_domains(identity: list[dict]) -> list[str]:
+    """Rewrite near-miss domain labels on identity-lane facts to the enum, in
+    place. Returns one ``ref: was -> now`` note per rewrite so the caller can
+    report them: a correction nobody sees is how a lane keeps getting it
+    wrong. A label with no single sensible target is left alone for
+    ``validate`` to reject with the allowed list."""
+    notes: list[str] = []
+    for i, rec in enumerate(identity):
+        got = rec.get("domain")
+        if not isinstance(got, str) or got in DOMAINS:
+            continue
+        now = DOMAIN_ALIASES.get(got.strip().lower())
+        if not now:
+            continue
+        rec["domain"] = now
+        notes.append(f"{rec.get('ref') or f'facts[{i}]'}: {got} -> {now}")
+    return notes
 
 
 def numbers_in(text: str) -> list[str]:
@@ -778,6 +845,7 @@ def cmd_expand(a: argparse.Namespace) -> int:
     by_c = {r["c"]: r for r in records}
 
     decisions, agent_selected, identity, problems = load_decisions(a.decisions)
+    domain_aliases = alias_identity_domains(identity)
     violations, folds, fallbacks = validate(records, clusters, decisions,
                                             existing_by_id, identity,
                                             a.fallback_original)
@@ -1076,6 +1144,7 @@ def cmd_expand(a: argparse.Namespace) -> int:
         "dropped": dropped,
         "selected": len(chosen),
         "identity_facts": len(identity_ids),
+        "domain_aliases": domain_aliases,
         "corroborated": corroborated,
         "reconciled": reconciled,
         "superseded": sum(1 for f in facts if f.get("superseded_by")),
@@ -1089,7 +1158,11 @@ def cmd_expand(a: argparse.Namespace) -> int:
     funnel(stage="merge", clusters=len(clusters), judged=summary["judged"],
            auto_dropped=auto_dropped, additive=len(additive),
            facts=len(facts), folded=len(terminal), dropped=dropped,
-           selected=len(chosen), elapsed_s=elapsed)
+           selected=len(chosen), identity_facts=len(identity_ids),
+           domain_aliases=len(domain_aliases), elapsed_s=elapsed)
+    if domain_aliases:
+        print("identity-lane domains aliased to the enum: "
+              + "; ".join(domain_aliases), file=sys.stderr)
     return 0
 
 

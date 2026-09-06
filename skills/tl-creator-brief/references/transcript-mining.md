@@ -46,6 +46,7 @@ downloaded that the model layer will not read.
 | `--per-video-cap` | 8 | no single video may own the batch set |
 | `--fragment-size` / `--fragments-per-doc` | 900 / 10 | passage width and how many per video |
 | `--page-size` / `--concurrency` | 150 / 4 | paging and parallel year buckets |
+| `--reserve` | 0 | agent slots held by other lanes during the fan-out (`1` when the socials lane is on). Batches are sized against `agent cap - reserve`, so the last extractor is not rejected and relaunched a wave later: 500 windows make 19 × 27 rather than 20 × 25 on a 20-agent host |
 | `--exclude` | none | a `classified.jsonl` from an earlier round: passages already judged (same video, start within 30 s) are skipped |
 
 **`cue-phrases.txt`** is one phrase per line, `#` for comments. A leading
@@ -300,9 +301,26 @@ are dropped (a second named voice is unattributable on any format);
 channels `unclear` and `narration` stay in as the host, capped at
 `unconfirmed`. Caps beat overrides: the agent can lower a confidence, never
 lift a capped cluster to `confirmed`. Those never reach the agent and are counted as
-`auto_dropped`. With `--shards N` the input is split by life domain into N
-files for N agents (folds never cross a domain, so a shard is a complete
-judgment unit).
+`auto_dropped`.
+
+**Shard by default.** With `--shards N` the input is split by life domain into
+N files for N agents (folds never cross a domain, so a shard is a complete
+judgment unit), spawned in ONE message like the extraction fan-out. Size N as
+`clusters / 60`, floor 1, ceiling 6. One agent on 226 clusters measured 475 s
+and is the single slowest pass in the pipeline after extraction.
+
+**The biggest domain sets the floor.** Shards hold whole domains, so a channel
+whose clusters pile into one domain cannot split below that domain's size. A
+226-cluster solo tech channel packed 105 / 40 / 40 / 41 at `--shards 4`,
+because `work` alone held 105 of the 226; raising N to 6 changed nothing.
+Read the per-file line counts from `prepare`'s JSON before assuming more
+shards will help, and expect the saving to be set by the largest shard rather
+than by the average.
+
+Each shard's reply is saved as its own `merge-decisions-r1-sN.json` and all of
+them are passed to `expand` as repeated `--decisions` flags. `selected` is
+**unioned** across the files rather than replaced, because each shard can only
+nominate from the domains it saw; `expand` still owns the final count.
 
 The agent reads `merge-input.jsonl` (plus the identity lane's findings when
 that lane ran) and **never the windows, never a transcript**. It decides

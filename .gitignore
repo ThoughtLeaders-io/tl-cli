@@ -9,3 +9,8 @@ build/
 .vscode/
 env
 .claude/settings.local.json
+
+# Run output: creator ledgers and connection pages, plus the working corpus.
+# Real client-adjacent data, never committed.
+skills/tl-creator-brief/tl-creator-profiles/
+.DS_Store

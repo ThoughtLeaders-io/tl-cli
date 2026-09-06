@@ -227,26 +227,52 @@ brand_read_date: 2026-09-02
 ---
 ```
 
-Then, first, one `## About <brand name>` section: two or three neutral
-sentences on what the brand is — positioning, product lines, stated audience
-— written from the **web and brand-social lanes and TL's public category /
-product description only**. Never from sponsorship patterns, never a price,
-never another client's data: this paragraph is forwarded with the page. The
-renderer shows it as prose above the connections, not as a card.
+The sections, in this order. The renderer reads the order from the file.
 
-Then one `## ` section per connection, strongest first — the section order
-IS the ranking and the page numbers them — with the type as a bold tag on
-the heading line: `## Runs on four hours of sleep — **direct**`. Each
-section holds, in this order:
+**`## About <creator name>`** — two or three sentences on who they are, in
+prose, drawn from the ledger. Not a fact list: the renderer has the ledger and
+renders the honesty strip itself. This leads the page because the reader needs
+to know whose brief they are holding.
+
+**`## Thesis`** — three or four sentences on why these two fit. The core of
+the page, and the part the reader acts on. It sits **above** the brand
+introduction deliberately: the argument first, the background after.
+
+**`## About <brand name>`** — two or three neutral sentences on what the brand
+is: positioning, product lines, stated audience, written from the **web and
+brand-social lanes and TL's public category / product description only**.
+Never from sponsorship patterns, never a price, never another client's data:
+this paragraph is forwarded with the page. The renderer shows it as prose, not
+as a card.
+
+**One `## ` section per connection**, strongest first — the section order IS
+the ranking and the page numbers them — with the type as a bold tag on the
+heading line: `## Runs on four hours of sleep — **direct**`. Each section
+holds, in this order:
 
 1. **The creator's own words** (or the social/web fact, labelled as such) —
    verbatim, timestamped, from the ledger, as a `>` quote with its `&t=`
-   link.
+   link. These are what the page's quote-bridge strip is built from, so they
+   carry the connection: pick the line that makes the fit obvious, not the
+   longest one.
 2. **What the brand offers that meets it**, and which brand-read lane that
    came from (`[web]`, `[social: instagram]`, ad-read sample, sponsorship
    patterns).
-3. **How this could be used** — one neutral line. Connection material, not ad
-   copy; nobody is handed words to read aloud.
+3. **How this could be used** — one neutral line on the use case.
+4. **Sample read** — ONE short illustrative line, optional, showing how the
+   angle could sound in the creator's own register. Labelled as an
+   illustration, never as approved copy, never a full script or a CTA. One
+   per connection at most.
+5. **Do** and **Do not** — one line each, the angle guidance in the form the
+   reader can act on. "Do" names the framing that works; "Do not" names the
+   specific way this angle goes wrong for this creator. Both concrete: "do
+   not open on the licence terms, he will explain them better unscripted"
+   beats "do not be too technical".
+
+**`## Where this could go wrong`** — the honest mismatch, always last and
+always present, even on a strong fit. What in the creator's material argues
+against this brand, stated plainly. The renderer keeps it out of the numbered
+connections so it can never be mistaken for an angle.
 
 Types: **direct** (fact ↔ product), **adjacent** (lifestyle/context fit),
 **category precedent** (the creator already does what the product enables,
@@ -277,17 +303,26 @@ in for a legacy headerless ledger). Top to bottom:
 
 1. **Header** — creator × brand, with the brand-read date and the ledger's
    build date.
-2. **Who they are** — the top recurring facts by life domain (the `selected`
-   facts first, then by recurrence; at most three per domain and twelve in
-   all), each with a short verbatim quote and its link, the format label and
-   the corpus window. Facts at tier `children` or `location` never enter
-   this section; `clinical` and `lifestyle` facts appear with their tier
+2. **Who they are** — the markdown's `## About <creator>` prose, followed by
+   the `selected` facts as a short readable run rather than a grid of
+   domain-labelled subsections. Facts at tier `children` or `location` never
+   enter this section; `clinical` and `lifestyle` facts appear with their tier
    badge; superseded facts stay in the ledger only.
-3. **About the brand** — the markdown's `## About …` section, as prose.
-4. **Connections** — one numbered card per connection section with its type
-   badge. Provenance labels in the markdown are kept: a connection map names
-   its lanes. A no-fit map renders its verdict as prose, no cards.
-5. **About this ledger** — the honesty strip the old ledger view carried:
+3. **The thesis** — the markdown's `## Thesis` section, rendered as the
+   page's lead block, above the brand. This is what the reader came for.
+4. **In their own words** — the quote-bridge strip: the strongest verbatim
+   quote from each connection section, with its `&t=` link, gathered in one
+   place so the evidence reads as evidence before the argument is made about
+   it.
+5. **About the brand** — the markdown's `## About <brand>` section, as prose.
+6. **Connections** — one numbered card per connection section with its type
+   badge, each carrying its quote, what the brand offers, the use case, the
+   optional labelled sample read, and the do / do-not pair. Provenance labels
+   in the markdown are kept: a connection map names its lanes. A no-fit map
+   renders its verdict as prose, no cards.
+7. **Where this could go wrong** — its own block after the cards, never
+   numbered among them, so an honest mismatch is never mistaken for an angle.
+8. **About this ledger** — the honesty strip the old ledger view carried:
    fact count with confidence tallies; sensitivity tiers with the count
    withheld from angles (`clinical` counts as withheld only below three
    videos, per `evidence-rules.md`); the coverage line —
@@ -301,6 +336,10 @@ gets a link; the files in `tl-creator-profiles/` are the durable copies.
 
 ## Never in any file
 
-Prices, costs, rate cards, deal terms, other clients' internal data,
-performance grades, or drafted ad copy. Every output is built to be
-forwarded.
+Prices, costs, rate cards, deal terms, other clients' internal data, or
+performance grades. Every output is built to be forwarded.
+
+Ad copy is bounded rather than banned: ONE short, clearly labelled **Sample
+read** line per connection is allowed, so the reader can see the angle land.
+Full scripts, CTA wording, alternate versions, and anything presented as
+approved copy are not.

@@ -374,6 +374,11 @@ def main() -> int:
                     help="windows per batch file (one extractor each); default: enough batches "
                          "to use every concurrent agent the host allows, "
                          "ceil(windows / $CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS), cap 20 when unset")
+    ap.add_argument("--reserve", type=int, default=0,
+                    help="agent slots held by other lanes during the fan-out "
+                         "(1 when the socials lane is on). Batches are sized "
+                         "against cap minus this, so the last extractor is "
+                         "not rejected and relaunched a wave later")
     ap.add_argument("--fragment-size", type=int, default=900)
     ap.add_argument("--fragments-per-doc", type=int, default=10)
     ap.add_argument("--per-video-cap", type=int, default=8)
@@ -598,7 +603,12 @@ def main() -> int:
             e["cues"].sort(key=lambda c: c[0])
             fh.write(json.dumps(e, ensure_ascii=False) + "\n")
     agent_cap = env_agent_cap()
-    batch_size = a.batch_size or derived_batch_size(len(kept), agent_cap)
+    # Every running agent counts against the host's cap, so a lane in flight
+    # during the fan-out costs one extractor slot: with 20 batches for a cap of
+    # 20 and the socials lane running, the 20th extractor was rejected and
+    # relaunched a wave later. Size the batches against what is actually free.
+    usable_cap = max(1, agent_cap - max(0, a.reserve))
+    batch_size = a.batch_size or derived_batch_size(len(kept), usable_cap)
     batches = []
     for i in range(0, len(kept), batch_size):
         p = bdir / f"batch-{i // batch_size:03d}.json"
@@ -612,6 +622,7 @@ def main() -> int:
         "videos_matched": len(corpus), "passages": len(windows),
         "windows_batched": len(kept), "videos_in_batches": len(per_video),
         "batch_size": batch_size, "agent_cap": agent_cap,
+        "reserved_slots": max(0, a.reserve), "usable_cap": usable_cap,
         "sponsor_flagged": sum(1 for w in kept if w["in_sponsor_read"]),
         "sponsor_source": sponsor_source,
         "batches": batches, "returns_dir": str(rdir),

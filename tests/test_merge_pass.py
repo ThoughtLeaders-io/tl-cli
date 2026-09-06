@@ -962,3 +962,105 @@ def test_a_supersession_cycle_exits_3(tmp_path):
         "c002": {"action": "keep", "supersedes": "c001"}})
     v = _violations(_expand(clustered, dpath, tmp_path / "facts.jsonl"))
     assert any("cycle" in why for whys in v.values() for why in whys)
+
+
+# --------------------------------------------------------------------------- #
+# sharding: `selected` is unioned across shard files, never replaced
+# --------------------------------------------------------------------------- #
+def test_prepare_shards_pack_whole_domains(tmp_path):
+    clusters = ([_cluster(f"work {i}", domain="work", video=f"w{i}")
+                 for i in range(6)]
+                + [_cluster(f"pets {i}", domain="pets", video=f"p{i}")
+                   for i in range(2)])
+    clustered = _write_clusters(tmp_path, clusters)
+    prep = _prepare(clustered, tmp_path / "prep", shards=2)
+    assert len(prep["files"]) == 2
+    per_file = []
+    for f in prep["files"]:
+        rows = [json.loads(ln) for ln in open(f, encoding="utf-8")]
+        per_file.append({r["domain"] for r in rows})
+    # a domain never straddles two shards, or a fold could cross a file
+    assert all(len(doms) >= 1 for doms in per_file)
+    assert not (per_file[0] & per_file[1])
+
+
+def test_selected_is_unioned_across_shard_decision_files(tmp_path):
+    clustered = _write_clusters(tmp_path, [
+        _cluster("one", domain="work", video="v1"),
+        _cluster("two", domain="pets", video="v2")])
+    # one file per shard: each nominates only from the domain it saw
+    a = _envelope(tmp_path, {"c001": {"action": "keep"}}, selected=["c001"],
+                  name="shard-a.json")
+    b = _envelope(tmp_path, {"c002": {"action": "keep"}}, selected=["c002"],
+                  name="shard-b.json")
+    out = tmp_path / "facts.jsonl"
+    proc = _expand(clustered, [a, b], out)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    facts = _facts(out)
+    # replacing rather than unioning would drop the first shard's pick
+    assert {f["claim"] for f in facts.values() if f["selected"]} == {"one", "two"}
+
+
+# --------------------------------------------------------------------------- #
+# a patch file must say what it is patching
+# --------------------------------------------------------------------------- #
+def test_a_patch_that_changes_nothing_exits_3(tmp_path):
+    clustered = _write_clusters(tmp_path, [_cluster("one")])
+    good = _envelope(tmp_path, {"c001": {"action": "keep"}}, name="r1.json")
+    noop = tmp_path / "patch.json"
+    noop.write_text(json.dumps({"decisions": {}}), encoding="utf-8")
+    v = _violations(_expand(clustered, [good, noop], tmp_path / "facts.jsonl"))
+    assert "changes nothing" in v["_files"][0]
+
+
+def test_an_empty_facts_list_never_silently_wipes_the_identity_lane(tmp_path):
+    clustered = _write_clusters(tmp_path, [_cluster("one")])
+    good = _envelope(tmp_path, {"c001": {"action": "keep"}},
+                     facts=[_identity()], name="r1.json")
+    wipe = tmp_path / "patch.json"
+    wipe.write_text(json.dumps({"decisions": {}, "facts": []}), encoding="utf-8")
+    v = _violations(_expand(clustered, [good, wipe], tmp_path / "facts.jsonl"))
+    assert any("would drop the 1 identity-lane fact" in p for p in v["_files"])
+
+
+def test_omitting_facts_leaves_the_earlier_lane_standing(tmp_path):
+    clustered = _write_clusters(tmp_path, [
+        _cluster("one", video="v1"), _cluster("two", video="v2")])
+    r1 = _envelope(tmp_path, {"c001": {"action": "keep"}},
+                   facts=[_identity()], name="r1.json")
+    patch = _envelope(tmp_path, {"c002": {"action": "keep"}}, name="patch.json")
+    out = tmp_path / "facts.jsonl"
+    proc = _expand(clustered, [r1, patch], out)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert json.loads(proc.stdout)["identity_facts"] == 1
+
+
+# --------------------------------------------------------------------------- #
+# identity-lane domains: near-misses are aliased and reported, never silent
+# --------------------------------------------------------------------------- #
+def test_near_miss_identity_domains_are_aliased_and_reported(tmp_path):
+    clustered = _write_clusters(tmp_path, [_cluster("one")])
+    dpath = _envelope(tmp_path, {"c001": {"action": "keep"}}, facts=[
+        _identity(ref="s1", domain="hobbies"),
+        _identity(ref="s2", domain="identity"),
+        _identity(ref="s3", domain="career")])
+    out = tmp_path / "facts.jsonl"
+    proc = _expand(clustered, dpath, out)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    summary = json.loads(proc.stdout)
+    assert summary["identity_facts"] == 3
+    assert summary["domain_aliases"] == ["s1: hobbies -> habits",
+                                         "s2: identity -> other",
+                                         "s3: career -> work"]
+    # the correction is announced; a silent rewrite is how a lane stays wrong
+    assert "aliased to the enum" in proc.stderr
+    assert {f["domain"] for f in _facts(out).values()
+            if f.get("source_url")} == {"habits", "other", "work"}
+
+
+def test_an_unplaceable_identity_domain_still_exits_3(tmp_path):
+    clustered = _write_clusters(tmp_path, [_cluster("one")])
+    dpath = _envelope(tmp_path, {"c001": {"action": "keep"}},
+                      facts=[_identity(ref="s1", domain="gardening")])
+    v = _violations(_expand(clustered, dpath, tmp_path / "facts.jsonl"))
+    assert "domain must be" in v["s1"][0]

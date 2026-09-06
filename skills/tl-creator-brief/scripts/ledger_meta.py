@@ -119,6 +119,11 @@ def load_context(path: str | None) -> dict | None:
         return None
     data = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
     return {"social_links": [str(x) for x in (data.get("social_links") or [])],
+            # A time-boxed socials lane reads some linked platforms and not
+            # others; carrying the split keeps the page's honesty strip from
+            # reporting an unopened page as read.
+            "social_links_read": [str(x) for x in (data.get("social_links_read") or [])],
+            "social_links_unread": [str(x) for x in (data.get("social_links_unread") or [])],
             "second_channel_candidates": [
                 {k: v for k, v in c.items() if k in ("name", "link", "id", "channel_id", "source")}
                 for c in (data.get("second_channel_candidates") or []) if isinstance(c, dict)]}

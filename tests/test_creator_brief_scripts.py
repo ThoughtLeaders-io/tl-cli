@@ -667,3 +667,123 @@ def test_youtu_be_shortlinks_are_not_second_channel_candidates():
            "description": "watch https://youtu.be/abc123 now"}
     cands = channel_context.second_channel_candidates(row, doc)
     assert [c["link"] for c in cands] == ["https://youtube.com/@mainVlogs"]
+
+
+# --------------------------------------------------------------------------- #
+# the one-pager: section order, the caveat block, and the --check pass
+# --------------------------------------------------------------------------- #
+_FULL_MD = (
+    "---\n"
+    "schema: tl-creator-connections/v2\n"
+    "channel_id: 42\n"
+    'channel_name: "Patterrz"\n'
+    "brand_id: 7\n"
+    "brand_name: Acme\n"
+    "facts_file: 42-facts.jsonl\n"
+    "brand_read_date: 2026-09-02\n"
+    "---\n\n"
+    "## About Patterrz\n\n"
+    "A solo creator who has been posting since 2019.\n\n"
+    "## Thesis\n\n"
+    "He already lives the thing Acme sells, and says so unprompted.\n\n"
+    "## About Acme\n\n"
+    "Acme is a direct-to-consumer dog food brand [web: product pages].\n\n"
+    "## Adopted a rescue dog — **direct**\n\n"
+    "> we finally adopted luna [watch](https://youtube.com/w?v=abc&t=12s)\n\n"
+    "Acme sells dog food [web]\n\n"
+    "**Do.** Let him tell the adoption story first.\n\n"
+    "**Do not.** Open on the ingredient list.\n\n"
+    "## Where this could go wrong\n\n"
+    "He has said he distrusts subscription boxes.\n"
+)
+
+
+def _check_conn(tmp_path: Path, md: str, name: str = "42-7-connections.md"):
+    src = tmp_path / name
+    src.write_text(md)
+    proc = subprocess.run(
+        [sys.executable, str(_SCRIPTS / "build_html.py"), "--in", str(src),
+         "--facts", str(_write_ledger(tmp_path)), "--check"],
+        capture_output=True, text=True)
+    return proc.returncode, json.loads(proc.stdout)
+
+
+def test_the_page_puts_the_thesis_and_the_quotes_above_the_brand(tmp_path):
+    html = _render_conn(tmp_path, _FULL_MD)
+    # the reader wants the argument and its evidence before the background
+    order = [html.index(x) for x in ('<h2>Who they are</h2>',
+                                     '<h2>The thesis</h2>',
+                                     '<h2>In their own words</h2>',
+                                     '<div class="about"><h3>About Acme</h3>',
+                                     '<h2>Connections</h2>')]
+    assert order == sorted(order)
+    assert "already lives the thing Acme sells" in html
+    # the creator introduction is prose inside "Who they are", not a card
+    assert "posting since 2019" in html.split('<h2>The thesis</h2>')[0]
+    conn = html.split("<h2>Connections</h2>")[1]
+    assert "About Patterrz" not in conn
+
+
+def test_the_quote_bridge_strip_carries_each_connections_first_quote(tmp_path):
+    html = _render_conn(tmp_path, _FULL_MD)
+    bridges = html.split('<div class="bridges">')[1].split("</div>")[0]
+    assert "we finally adopted luna" in bridges
+    assert 'href="https://youtube.com/w?v=abc&amp;t=12s"' in bridges
+
+
+def test_the_caveat_is_kept_but_never_numbered_among_the_connections(tmp_path):
+    html = _render_conn(tmp_path, _FULL_MD)
+    # honest mismatch beats overfitting, so it stays on the page …
+    assert "distrusts subscription boxes" in html
+    assert '<div class="caveat">' in html
+    # … but a caveat inside the ranked list reads as an angle
+    conn = html.split('<ol class="conn">')[1].split("</ol>")[0]
+    assert conn.count('<li><div class="body">') == 1
+    assert "could go wrong" not in conn.lower()
+    assert html.index('<ol class="conn">') < html.index('<div class="caveat">')
+
+
+def test_check_passes_a_complete_map(tmp_path):
+    code, report = _check_conn(tmp_path, _FULL_MD)
+    assert code == 0 and report["ok"] and report["problems"] == []
+
+
+def test_check_names_every_missing_section(tmp_path):
+    stripped = _FULL_MD.replace(
+        "## About Patterrz\n\nA solo creator who has been posting since 2019.\n\n", ""
+    ).replace(
+        "## Thesis\n\nHe already lives the thing Acme sells, and says so unprompted.\n\n", ""
+    ).replace(
+        "## Where this could go wrong\n\nHe has said he distrusts subscription boxes.\n", ""
+    )
+    code, report = _check_conn(tmp_path, stripped)
+    assert code == 3 and not report["ok"]
+    joined = " | ".join(report["problems"])
+    assert "## About Patterrz" in joined
+    assert "## Thesis" in joined
+    assert "Where this could go wrong" in joined
+
+
+def test_check_catches_a_connection_with_no_quote_and_price_language(tmp_path):
+    md = _FULL_MD.replace(
+        "> we finally adopted luna [watch](https://youtube.com/w?v=abc&t=12s)\n\n",
+        "He mentions a dog sometimes.\n\n")
+    md += "\nThe integration ran at a $4,000 flat fee.\n"
+    code, report = _check_conn(tmp_path, md)
+    assert code == 3
+    joined = " | ".join(report["problems"])
+    assert "carries no quote" in joined
+    assert "price, cost or rate language" in joined
+
+
+def test_a_render_still_writes_the_page_but_reports_contract_problems(tmp_path):
+    """--check gates; a plain render never silently swallows the same finding."""
+    src = tmp_path / "42-7-connections.md"
+    src.write_text(_CONN_MD)          # no creator intro, no thesis, no caveat
+    proc = subprocess.run(
+        [sys.executable, str(_SCRIPTS / "build_html.py"), "--in", str(src),
+         "--facts", str(_write_ledger(tmp_path))],
+        capture_output=True, text=True, check=True)
+    assert Path(json.loads(proc.stdout)["html"]).exists()
+    assert json.loads(proc.stdout)["problems"]
+    assert "PAGE CONTRACT" in proc.stderr

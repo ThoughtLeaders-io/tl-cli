@@ -682,3 +682,16 @@ def test_run_derives_the_batch_size_from_the_cap_unless_the_flag_is_given(tmp_pa
     summary, _ = _run(tmp_path, monkeypatch, docs, argv=("--batch-size", "5"),
                       census_total=6, langs={"en": 6})
     assert summary["batch_size"] == 5 and len(summary["batches"]) == 3
+
+
+def test_reserve_leaves_room_for_lanes_running_beside_the_fan_out():
+    """A lane in flight during the fan-out costs one extractor slot, so the
+    batches are sized against what is actually free. 20 batches for a cap of
+    20 with the socials lane running meant the 20th extractor was rejected and
+    relaunched a wave later."""
+    cap = 20
+    assert fetch_cues.derived_batch_size(500, cap) == 25            # 20 batches
+    assert fetch_cues.derived_batch_size(500, cap - 1) == 27        # 19 batches
+    assert -(-500 // fetch_cues.derived_batch_size(500, cap - 1)) == 19
+    # reserving more than the cap can never produce zero or negative batches
+    assert fetch_cues.derived_batch_size(500, max(1, cap - 99)) >= 1

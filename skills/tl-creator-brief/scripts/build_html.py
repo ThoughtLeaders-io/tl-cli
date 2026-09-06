@@ -198,6 +198,30 @@ header { padding-bottom: 1.4rem; border-bottom: 1px solid var(--line); }
   font-family: Fraunces, "Iowan Old Style", Georgia, serif;
 }
 .who .q a { color: var(--ink-3); font-style: normal; font-family: "IBM Plex Mono", monospace; font-size: .72rem; }
+.who-run { list-style: none; margin: 0; padding: 0; }
+.who-run li {
+  margin: 0 0 .6rem; padding-left: .9rem; border-left: 2px solid var(--accent);
+}
+.who-run .claim { font-weight: 600; }
+.who-run .q {
+  display: block; font-style: italic; color: var(--ink-2); margin-top: .15rem;
+}
+.who-run .q a {
+  color: var(--ink-3); font-style: normal;
+  font-family: "IBM Plex Mono", monospace; font-size: .72rem;
+}
+.thesis {
+  border-left: 3px solid var(--accent); padding: .1rem 0 .1rem 1rem;
+  margin: 0 0 1.4rem;
+}
+.thesis p { font-size: 1.08rem; line-height: 1.6; max-width: 68ch; }
+.bridges { margin: 0 0 1.4rem; }
+.bridges blockquote { margin: 0 0 .7rem; }
+.caveat {
+  border: 1px solid var(--line); border-left: 3px solid var(--ink-3);
+  padding: .8rem 1rem; margin: 1rem 0 1.6rem; background: var(--surface);
+}
+.caveat p { margin: .35rem 0; max-width: 70ch; }
 .conn { list-style: none; margin: 0; padding: 0; counter-reset: rank; }
 .conn > li {
   display: grid; grid-template-columns: 3rem 1fr; gap: 0 1rem; margin: 0 0 1.1rem;
@@ -373,16 +397,81 @@ def plain(title_html: str) -> str:
 
 
 def is_about(title_html: str) -> bool:
-    """``## About <brand>`` — the brand strip, context rather than a
-    connection, so it never becomes a numbered card."""
+    """``## About <name>`` — a context strip, never a numbered card. Covers
+    both the creator and the brand introductions."""
     return plain(title_html).lower().startswith("about ")
 
 
+def is_thesis(title_html: str) -> bool:
+    """``## Thesis`` — the page's lead argument, rendered above the brand."""
+    return plain(title_html).lower().rstrip(":").strip() in (
+        "thesis", "core thesis", "the thesis")
+
+
+def is_caveat(title_html: str) -> bool:
+    """``## Where this could go wrong`` — the honest mismatch. It is a ``## ``
+    section like any other in the markdown, but it must NEVER render as a
+    numbered connection: a caveat sitting in the ranked list reads as an
+    angle, which is exactly the "bunch of random connections" complaint."""
+    t = plain(title_html).lower()
+    return any(k in t for k in ("could go wrong", "does not connect",
+                                "doesn't connect", "what does not fit",
+                                "mismatch", "caveat"))
+
+
+def names_creator(title_html: str, creator: str) -> bool:
+    """Does this ``## About …`` heading introduce the creator rather than the
+    brand? Compared on the name so a brand called "About Time" cannot win."""
+    t = plain(title_html).lower()
+    c = str(creator or "").strip().lower()
+    return bool(c) and c in t
+
+
 def about_block(sections: list[tuple[str, str]]) -> str:
-    """The brand strip: plain prose above the cards."""
+    """A context strip: plain prose, never a card."""
     blocks = [f'<div class="about"><h3>{title}</h3>{rest}</div>'
               for title, rest in sections]
     return "".join(blocks)
+
+
+def thesis_block(sections: list[tuple[str, str]]) -> str:
+    """The lead argument, above the brand introduction. Deliberately the most
+    prominent prose on the page: it is what the reader acts on."""
+    if not sections:
+        return ""
+    bodies = "".join(rest for _, rest in sections)
+    return f'<h2>The thesis</h2><div class="thesis">{bodies}</div>'
+
+
+def caveat_block(sections: list[tuple[str, str]]) -> str:
+    """"Where this could go wrong", after the cards and outside the ranking.
+    An honest mismatch beats overfitting to a perfect match, so this is kept
+    rather than trimmed away — just never numbered among the angles."""
+    if not sections:
+        return ""
+    bodies = "".join(rest for _, rest in sections)
+    title = plain(sections[0][0]) or "Where this could go wrong"
+    return (f'<h2>{html.escape(title)}</h2>'
+            f'<div class="caveat">{bodies}</div>')
+
+
+_BLOCKQUOTE = re.compile(r"<blockquote>.*?</blockquote>", re.S)
+
+
+def quote_bridges(sections: list[tuple[str, str]]) -> str:
+    """The quote-bridge strip: the first verbatim quote from each connection,
+    gathered in one place so the evidence reads as evidence before any
+    argument is made about it. Sections carry their quotes as ``>`` blocks, so
+    the strongest one is the first."""
+    quotes = []
+    for _, rest in sections:
+        m = _BLOCKQUOTE.search(rest)
+        if m:
+            quotes.append(m.group(0))
+    if not quotes:
+        return ""
+    return ('<h2>In their own words</h2>'
+            f'<div class="bridges">{"".join(quotes)}</div>')
 
 
 def connection_cards(sections: list[tuple[str, str]], intro: str = "") -> str:
@@ -504,14 +593,25 @@ def context_section(meta: dict) -> str:
     sibs = ctx.get("second_channel_candidates") or []
     if not links and not sibs:
         return ""
-    read = str(meta.get("lanes") or "") == "transcripts+socials"
+    lane_ran = str(meta.get("lanes") or "") == "transcripts+socials"
+    # A lane that ran is not a lane that read everything: it is time-boxed, and
+    # pages it never opened must not be reported as read. When the context
+    # carries the per-link truth, honour it; otherwise fall back to the lane flag.
+    def _norm(u: str) -> str:
+        return re.sub(r"^(?:https?://)?(?:www\.)?", "", str(u).strip().rstrip("/")).lower()
+    were_read = {_norm(u) for u in (ctx.get("social_links_read") or [])}
+    per_link = bool(ctx.get("social_links_read") or ctx.get("social_links_unread"))
     items = []
     for link in links:
         raw = str(link)
         shown = html.escape(raw)
         if raw.lower().startswith(("http://", "https://")):
             shown = f'<a href="{html.escape(raw, quote=True)}">{shown}</a>'
-        items.append(f"<li>{shown} — {'read (socials lane)' if read else 'linked but unread (socials lane not run)'}</li>")
+        if per_link:
+            note = "read (socials lane)" if _norm(raw) in were_read else "linked but unread"
+        else:
+            note = "read (socials lane)" if lane_ran else "linked but unread (socials lane not run)"
+        items.append(f"<li>{shown} — {note}</li>")
     for c in sibs:
         name = html.escape(str(c.get("name") or c.get("link") or ""))
         ident = c.get("id") or c.get("channel_id")
@@ -575,8 +675,25 @@ def short_quote(quote: str, words: int = 14) -> str:
     return " ".join(toks[:words]) + ("…" if len(toks) > words else "")
 
 
-def who_they_are(facts: list[dict], meta: dict) -> str:
-    groups = pick_who(facts)
+def pick_who_flat(facts: list[dict], *, max_facts: int = WHO_MAX_FACTS,
+                  per_domain: int = WHO_MAX_PER_DOMAIN) -> list[dict]:
+    """The same picks as ``pick_who``, flattened back into one ranked run.
+
+    The domain grid this replaces read as a database view of a person rather
+    than an introduction. The per-domain cap is kept, because it is what stops
+    one talkative domain owning the whole strip, but the domains stop being
+    headings."""
+    out: list[dict] = []
+    for _, items in pick_who(facts, max_facts=max_facts, per_domain=per_domain):
+        out.extend(items)
+    out.sort(key=lambda f: (bool(f.get("selected")),
+                            int(f.get("recurrence") or 0),
+                            f.get("confidence") == "confirmed"), reverse=True)
+    return out[:max_facts]
+
+
+def who_they_are(facts: list[dict], meta: dict, intro_html: str = "") -> str:
+    picks = pick_who_flat(facts)
     fmt = meta.get("format")
     lead = []
     if fmt:
@@ -589,26 +706,23 @@ def who_they_are(facts: list[dict], meta: dict) -> str:
     if cov.get("facts"):
         lead.append(f"{cov['facts']} facts in the ledger")
     head = ('<h2>Who they are</h2>'
+            + (f'<div class="about">{intro_html}</div>' if intro_html else "")
             + (f'<ul class="meta">{"".join(f"<li>{html.escape(x)}</li>" for x in lead)}</ul>'
                if lead else ""))
-    if not groups:
+    if not picks:
         return head + '<p class="empty">The ledger holds no facts that can appear on a brand-facing page.</p>'
-    cols = []
-    for domain, items in groups:
-        lis = []
-        for f in items:
-            claim = html.escape(str(f.get("claim") or ""))
-            q = ""
-            if f.get("quote"):
-                q = html.escape(short_quote(str(f["quote"])))
-                url = str(f.get("url") or "")
-                if url.lower().startswith(("http://", "https://")):
-                    q += f' <a href="{html.escape(url, quote=True)}">watch</a>'
-                q = f'<span class="q">“{q}”</span>' if q else ""
-            lis.append(f'<li><span class="claim">{claim}</span>{tier_badge(f)}{q}</li>')
-        label = html.escape(DOMAIN_LABELS.get(domain, domain.title()))
-        cols.append(f'<div class="domain"><h3>{label}</h3><ul>{"".join(lis)}</ul></div>')
-    return head + f'<div class="who">{"".join(cols)}</div>'
+    lis = []
+    for f in picks:
+        claim = html.escape(str(f.get("claim") or ""))
+        q = ""
+        if f.get("quote"):
+            q = html.escape(short_quote(str(f["quote"])))
+            url = str(f.get("url") or "")
+            if url.lower().startswith(("http://", "https://")):
+                q += f' <a href="{html.escape(url, quote=True)}">watch</a>'
+            q = f'<span class="q">“{q}”</span>' if q else ""
+        lis.append(f'<li><span class="claim">{claim}</span>{tier_badge(f)}{q}</li>')
+    return head + f'<ul class="who-run">{"".join(lis)}</ul>'
 
 
 # --------------------------------------------------------------------------- #
@@ -676,12 +790,106 @@ def render_connections(md_text: str, facts: list[dict] | None, meta: dict) -> tu
     header_extra = (f'<ul class="meta">{"".join(f"<li>{html.escape(c)}</li>" for c in chips)}</ul>'
                     if chips else "")
     intro, sections = split_sections(body_html)
-    about = [sec for sec in sections if is_about(sec[0])]
-    conns = [sec for sec in sections if not is_about(sec[0])]
-    who = who_they_are(facts, meta) if facts is not None else ""
-    body_out = (who + about_block(about) + "<h2>Connections</h2>"
-                + connection_cards(conns, intro) + ledger_footer(facts, meta))
+
+    # One deliverable, in the order the reader needs it: who this is, the
+    # argument, the evidence, then the brand, then the ranked angles, then the
+    # honest mismatch. The thesis and the quotes sit ABOVE the brand strip
+    # deliberately — the reader wants the case before the background.
+    creator_about, brand_about, thesis, caveats, conns = [], [], [], [], []
+    for sec in sections:
+        if is_thesis(sec[0]):
+            thesis.append(sec)
+        elif is_caveat(sec[0]):
+            caveats.append(sec)
+        elif is_about(sec[0]):
+            (creator_about if names_creator(sec[0], creator)
+             else brand_about).append(sec)
+        else:
+            conns.append(sec)
+
+    # the creator intro is prose inside "Who they are", not a card of its own
+    creator_intro = "".join(rest for _, rest in creator_about)
+    who = who_they_are(facts, meta, creator_intro) if facts is not None else (
+        about_block(creator_about))
+    body_out = (who
+                + thesis_block(thesis)
+                + quote_bridges(conns)
+                + about_block(brand_about)
+                + ("<h2>Connections</h2>" if conns or intro else "")
+                + connection_cards(conns, intro)
+                + caveat_block(caveats)
+                + ledger_footer(facts, meta))
     return title, page_html(title, "creator × brand connection map", header_extra, body_out)
+
+
+# --------------------------------------------------------------------------- #
+# --check: the mechanical half of a QA pass, in the renderer
+# --------------------------------------------------------------------------- #
+# A second agent re-reading the first agent's page cost a measured 234 s and
+# caught only things a script can check. These are those things. What a script
+# cannot check — whether the thesis is any good — stays the connection pass's
+# job and is not re-litigated by another model.
+_MONEY = re.compile(r"(?<![\w-])(?:[$€£]\s?\d|\d+\s?(?:usd|eur|gbp)\b"
+                    r"|\bcpm\b|\brate card\b|\bflat fee\b"
+                    r"|\bper (?:video|integration|read)\b\s*[:=]?\s*[$€£\d])",
+                    re.I)
+# A quote's link must point at the moment it was said. The href is already
+# entity-escaped by the renderer, so the separator can be "?", "&" or "&amp;".
+_TIMED_LINK = re.compile(r'href="[^"]*(?:\?|&amp;|&)t=\d', re.I)
+
+
+def check_page(md_text: str, facts: list[dict] | None, meta: dict) -> list[str]:
+    """Contract problems with the deliverable, as one line each. Empty means
+    the page is publishable."""
+    problems: list[str] = []
+    fm, body = parse_frontmatter(md_text)
+    creator = fm.get("channel_name") or meta.get("channel_name") or ""
+    _, sections = split_sections(render_markdown(body))
+
+    kinds = {"thesis": [], "caveat": [], "creator": [], "brand": [], "conn": []}
+    for sec in sections:
+        if is_thesis(sec[0]):
+            kinds["thesis"].append(sec)
+        elif is_caveat(sec[0]):
+            kinds["caveat"].append(sec)
+        elif is_about(sec[0]):
+            kinds["creator" if names_creator(sec[0], creator) else "brand"].append(sec)
+        else:
+            kinds["conn"].append(sec)
+
+    no_fit = not kinds["conn"]
+    for key, label in (("creator", f"## About {creator or '<creator>'}"),
+                       ("thesis", "## Thesis"),
+                       ("brand", "## About <brand>")):
+        if not kinds[key]:
+            problems.append(f"missing section: {label}")
+    if not kinds["caveat"]:
+        problems.append("missing section: ## Where this could go wrong — an "
+                        "honest mismatch is required even on a strong fit")
+
+    # every connection card must carry its evidence
+    for title, rest in kinds["conn"]:
+        name = plain(title)[:60]
+        quote = _BLOCKQUOTE.search(rest)
+        if not quote:
+            problems.append(f"connection carries no quote: {name}")
+        elif not _TIMED_LINK.search(quote.group(0)):
+            problems.append(f"connection quote has no timestamped link: {name}")
+
+    # the bans that survive the sample-read exception
+    for m in _MONEY.finditer(html.unescape(re.sub(r"<[^>]+>", " ", body))):
+        problems.append(f"price, cost or rate language on the page: "
+                        f"{m.group(0).strip()!r}")
+        break
+
+    # withheld tiers never reach a brand-facing page
+    for f in (facts or []):
+        if tier_of(f) in WITHHELD and f.get("selected"):
+            problems.append(f"selected fact at withheld tier "
+                            f"{tier_of(f)}: {str(f.get('claim'))[:50]}")
+    if no_fit and not kinds["thesis"]:
+        problems = [p for p in problems if not p.startswith("missing section: ## Thesis")]
+    return problems
 
 
 def main() -> None:
@@ -697,18 +905,31 @@ def main() -> None:
     ap.add_argument("--out", default=None,
                     help="default: <facts dir>/<channel_id>-<brand_id>-connections.html, "
                          "or the input path with .html when --facts is omitted")
+    ap.add_argument("--check", action="store_true",
+                    help="validate the map against the page contract and exit "
+                         "3 if it fails; writes nothing")
     a = ap.parse_args()
 
     facts_path = pathlib.Path(a.facts) if a.facts else None
     facts, meta = load_ledger(facts_path, pathlib.Path(a.meta) if a.meta else None)
     in_path = pathlib.Path(a.infile)
     text = in_path.read_text(encoding="utf-8")
+
+    problems = check_page(text, facts, meta)
+    if a.check:
+        print(json.dumps({"in": str(in_path), "problems": problems,
+                          "ok": not problems}, indent=1))
+        raise SystemExit(3 if problems else 0)
+
     out_path = (pathlib.Path(a.out) if a.out
                 else default_out(in_path, facts_path, parse_frontmatter(text)[0]))
     title, page = render_connections(text, facts, meta)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(page, encoding="utf-8")
-    print(json.dumps({"html": str(out_path), "title": title}))
+    print(json.dumps({"html": str(out_path), "title": title,
+                      "problems": problems}))
+    if problems:
+        print("PAGE CONTRACT: " + "; ".join(problems), file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -122,7 +122,12 @@ def test_write_carries_descriptive_fields_over_from_the_existing_header(tmp_path
                       "--lanes", "transcripts+socials", "--context", str(ctx)])
     first = _header(profiles)
     assert first["lanes"] == "transcripts+socials"
+    # the read/unread split is carried even when the context file omits it, so
+    # the page's honesty strip can say which linked platforms were actually
+    # opened rather than reporting every link as read
     assert first["context"] == {"social_links": ["https://x.com/p"],
+                                "social_links_read": [],
+                                "social_links_unread": [],
                                 "second_channel_candidates": [
                                     {"name": "Clips", "link": "https://youtube.com/@c",
                                      "source": "social_links"}]}

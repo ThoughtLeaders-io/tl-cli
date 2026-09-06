@@ -58,30 +58,34 @@ listed. Brand (CONNECT only): `tl brands find`; a rebrand returns several IDs
 corpus that cannot be read. An unrecognised value: name it and continue —
 tier names change.
 
-## Socials lane — ask up front, default OFF
+**The gate is bounded.** Run it with `timeout 20 tl whoami --json`. On a
+timeout or a non-zero exit, retry ONCE. If the second attempt also fails, say
+so in one line and **continue the run**: the gate exists to avoid building a
+corpus nobody can read, not to be the reason a run does not happen. Report
+`plan gate: unreachable, continued` in the run report so the user knows the
+tier was never confirmed. A measured run lost ~100 s to an unbounded retry
+here.
+
+## Socials lane — a flag, default OFF
 
 The identity & socials lane (web search on the creator, their linked
-Instagram/X/about pages actually opened and read) is **opt-in**. Ask once, at
-the start of the run — before any fetch — as a single question with the
-default first:
+Instagram/X/about pages actually opened and read) is **opt-in, and it is a
+flag on the invocation, never a question that blocks the run**. Read it from
+the request and start immediately:
 
-> **Run the socials/web identity lane?**
-> - **No — transcripts only** (default): the creator's own videos are the
->   only source. Faster, and every fact carries a timestamped quote.
-> - **Yes — add socials & web**: also search the web for the creator and read
->   their linked profiles, for facts the videos never state and for cross-lane
->   confirmation.
+- `--socials` / "include socials" / "check their Instagram" / "add web" →
+  lane ON.
+- `--no-socials` / "transcripts only" / "no web" → lane OFF.
+- **Nothing said → lane OFF.** This is the default, not a thing to confirm.
 
-Do not ask when the answer is already settled:
+Never open with `AskUserQuestion` here. The lane is off by default, so asking
+buys a confirmation of the default and costs the run the user's response time;
+a measured run lost 124 s to exactly this. Say which shape you took in the run
+report instead, with "re-run with `--socials`" as the one-line fix. Autonomous,
+scheduled and fast runs are unchanged: lane OFF, nothing asked.
 
-- The initiating request states a preference ("include socials", "check their
-  Instagram", "transcripts only", "no web") — honor it, say which lane shape
-  you took, and move on.
-- The run is **autonomous / no-pause** (`autonomous`, `--auto`, a scheduled or
-  unattended run) or a **fast run** — the lane is OFF, no question asked.
-
-Everything below marked *(socials lane ON)* applies only when the answer was
-yes.
+Everything below marked *(socials lane ON)* applies only when the flag was
+set.
 
 ## Reuse — the found ledger wins
 
@@ -127,8 +131,15 @@ prints a `FUNNEL` line; the details live in `references/transcript-mining.md`.
 1. **Fetch the cue passages — one script, under a minute.**
 
    ```bash
-   python3 scripts/fetch_cues.py --channel <id> --host-terms "<surname>,<company>"
+   python3 scripts/fetch_cues.py --channel <id> --host-terms "<surname>,<company>" \
+     [--reserve 1]
    ```
+
+   **`--reserve N` when other agents will be in flight during the fan-out.**
+   Batches are sized to fill one wave of the host's agent cap, so with the
+   socials lane running the 20th extractor is rejected and relaunched a wave
+   later. Pass `--reserve 1` whenever the socials lane is on, and one more for
+   any other lane you launch alongside.
 
    It asks the index for the transcript passages around first-person cue
    phrases (`references/cue-phrases.txt`) and writes ranked, capped batches of
@@ -140,15 +151,35 @@ prints a `FUNNEL` line; the details live in `references/transcript-mining.md`.
    for this first round come from the channel's own metadata and the user's
    request, and any name the lane turns up later feeds a **second round**
    (`--exclude`, step 3a), never a delayed first one.
-   - *(socials lane ON)* the identity & socials subagent runs alongside:
-     (a) channel metadata via `scripts/channel_context.py`; (b) a web search
-     on the creator's and channel's names, top results actually read; (c) the
-     channel's social links opened and read — the personal life often lives
-     on a different platform than the content. Facts land with `social`/`web`
-     provenance and URLs, never dressed as quotes. **Time-box it**: ~8
-     lookups, one pass each, no crawling beyond a linked page. Whatever it
-     has when the extraction finishes is what the merge pass gets; anything
-     unreached is reported "linked but unread".
+   - *(socials lane ON)* the identity & socials subagent runs alongside —
+     **spawn it as `general-purpose` with `model: sonnet`**, never on the
+     inherited model: (a) channel metadata via `scripts/channel_context.py`;
+     (b) a web search on the creator's and channel's names, top results
+     actually read; (c) the channel's social links opened and read — the
+     personal life often lives on a different platform than the content.
+     Facts land with `social`/`web` provenance and URLs, never dressed as
+     quotes. **Time-box it**: ~8 lookups, one pass each, no crawling beyond a
+     linked page. Whatever it has when the extraction finishes is what the
+     merge pass gets; anything unreached is reported "linked but unread".
+     - **Give the lane the record contract, in the prompt.** It writes ledger
+       records directly rather than judging clusters, so it must be told the
+       enums or it invents plausible words that `merge_pass.py expand`
+       rejects — a measured run had 5 of 9 facts come back on labels like
+       `hobbies`, `identity` and `gear`, and the stage cost a hand-written
+       patch. Every fact it returns carries exactly:
+       `claim`, `domain`, `sensitivity`, `source_url`, `seen_date`, and a
+       `ref` (`s1`, `s2`, …); optionally `provenance` (`social` | `web`),
+       `confidence`, `corroborates`, `gloss`. It carries **no** `quote`,
+       `video`, `start` or `url` — those belong to the transcript lane alone.
+       - `domain` is one of exactly: `origin`, `family`, `pets`, `home`,
+         `work`, `money`, `health`, `habits`, `tastes`, `beliefs`,
+         `relationships`, `other`. Nothing else. A hobby is `habits`; a job
+         or a business is `work`; anything that genuinely fits none of the
+         twelve is `other`.
+       - `sensitivity` is one of exactly: `none`, `lifestyle`, `clinical`,
+         `children`, `location` (`references/evidence-rules.md`).
+       `expand` aliases the common near-misses and reports each one, but a
+       label it cannot place still fails the whole stage.
    - **Second channels: report, don't mine.** `channel_context.py` emits
      `second_channel_candidates`; each is resolved with `tl channels find`
      and listed in the page's "Other channels and platforms" section
@@ -161,12 +192,29 @@ prints a `FUNNEL` line; the details live in `references/transcript-mining.md`.
      the ledger is transcript-only and cross-lane corroboration cannot raise
      anything (`references/profile-spec.md`). Say in the run report that the
      lane was off, and that turning it on is one re-run away.
-2. **Channel context brief.** `channel_context.py --channel <id> --corpus ...`
-   calls the format label (solo / interview / multi-host / faceless-scripted)
-   with evidence. Its corpus stats are now measured over the fetched
-   **passages**, not whole transcripts, so read them as a format hint, not a
-   census. Not a gate — nothing exits early. Its stdout is the summary only;
-   per-video stat rows go to a file via `--per-video-out`.
+2. **Channel context brief — chained into the prompt render, one command.**
+   `channel_context.py --channel <id> --corpus ...` calls the format label
+   (solo / interview / multi-host / faceless-scripted) with evidence. Its
+   corpus stats are now measured over the fetched **passages**, not whole
+   transcripts, so read them as a format hint, not a census. Not a gate —
+   nothing exits early. Its stdout is the summary only; per-video stat rows go
+   to a file via `--per-video-out`.
+
+   Both this and step 3's prompt render are local scripts that take under a
+   second each, so run them as ONE `&&` chain, the way step 4 already chains
+   assemble → cluster → prepare. Two separate steps cost a turn round-trip
+   between them and nothing else: measured at 31 s split versus 2 s chained.
+
+   ```bash
+   python3 scripts/channel_context.py --channel <id> --corpus <…> \
+     --per-video-out <…>/per-video.jsonl > <…>/context-full.json && \
+   python3 -c "…"  # write context.json from context-full.json  && \
+   for b in <…>/batches/batch-*.json; do \
+     n=$(basename "$b" .json); \
+     python3 scripts/extractor_prompt.py --batch "$b" --context <…>/context.json \
+       --write-to <…>/returns/$n.extract.json --out <…>/prompts/$n.md; \
+   done
+   ```
 3. **Extraction fan-out — one agent per batch, one message.** Classification
    and extraction are the same pass. Write the context block once
    (`context.json`: `channel_name`, `host_names`, `known_facts`,
@@ -232,7 +280,28 @@ prints a `FUNNEL` line; the details live in `references/transcript-mining.md`.
    merge pass one read instead of thirty. Merge rules:
    `references/transcript-mining.md`, Layer 4. Do not hand-merge what the
    script left apart.
-6. **Merge pass — decisions from one agent, the ledger from a script.**
+6. **Merge pass — decisions from sharded agents, the ledger from a script.**
+   **Model: Opus, deliberately.** This is the one pass where the expensive
+   context is the point (`references/transcript-mining.md`, opening): it is
+   judgment no script can encode. Do not downgrade it to make the run faster;
+   shard it instead.
+
+   **Shard by default.** `merge_pass.py prepare --shards N` splits the input
+   by life domain into N files for N agents, spawned in ONE message like the
+   extraction fan-out. Folds never cross a domain, so each shard is a complete
+   judgment unit. Size N as `clusters / 60`, floor 1, ceiling 6 — 226 clusters
+   means 4. One agent on 226 clusters measured 475 s.
+   - **The largest domain sets the floor.** Shards hold whole domains, so a
+     channel whose clusters pile into one domain cannot split below that
+     domain's size: 226 clusters on a solo tech channel packed 105 / 40 / 40 /
+     41 because `work` alone held 105. Raising N past the point where the
+     biggest domain has its own shard buys nothing. Read the shard line sizes
+     from `prepare`'s JSON before assuming more shards will help.
+   - Each shard's reply is saved as its own `merge-decisions-r1-sN.json` and
+     all of them are passed to `expand` as repeated `--decisions` flags.
+     `selected` is unioned across shard files (each shard can only nominate
+     from the domains it saw), and `expand` still owns the final count.
+
    `merge_pass.py prepare` (already run in step 4) writes `merge-input.jsonl`.
    The script applies the deterministic parts of `evidence-rules.md` itself
    (guest and co-host voices dropped; unclear voices dropped on shared-voice
@@ -295,11 +364,11 @@ passes, so **they report their own counts in the same format**. Echo all six
 lines, as they were emitted:
 
 ```
-FUNNEL stage=fetch_cues videos_matched=… passages=… windows_capped=… batches=… sponsor_source=… elapsed_s=…
+FUNNEL stage=fetch_cues round=… videos_with_transcript=… videos_matched=… passages=… windows_capped=… batches=… batch_size=… agent_cap=… sponsor_source=… elapsed_s=…
 FUNNEL stage=extract batches=… agents=… windows=… gems=… elapsed_s=…   ← you print this one
 FUNNEL stage=assemble windows_expected=… windows_assembled=… gems=… unjudged=… coverage=… elapsed_s=…
 FUNNEL stage=cluster gems=… clusters=… merged=… elapsed_s=…
-FUNNEL stage=merge clusters=… judged=… auto_dropped=… facts=… folded=… dropped=… selected=… elapsed_s=…
+FUNNEL stage=merge clusters=… judged=… auto_dropped=… additive=… facts=… folded=… dropped=… selected=… identity_facts=… domain_aliases=… elapsed_s=…
 FUNNEL stage=verify candidates=… verified=… rejected=… passed_through=… elapsed_s=…
 ```
 
@@ -357,8 +426,17 @@ Run the `## Reuse` check first: `reuse` loads `<channel_id>-facts.jsonl`
 incremental round,
 `build` runs the PROFILE pipeline. Then:
 
-1. **Brand read — four lanes, all cheap subagents, all four spawned in ONE
-   message, one-shot:**
+1. **Brand read — four lanes plus the category probe, FIVE agents spawned in
+   ONE message, one-shot.** Every one of them is `general-purpose` with an
+   explicit **`model: sonnet`**. None of them may inherit the orchestrator's
+   model: an unnamed model is how a measured run put the category probe on
+   Opus for 456 s against 121 s for the same probe on Sonnet.
+
+   All five need only the channel and the brand, never the creator ledger, so
+   this message goes out **as early as the brand is resolved** — alongside the
+   merge pass on a build run, immediately on a `reuse` run. The four lanes
+   already ran concurrently with the merge and cost nothing; the probe is the
+   one that was left queueing until step 2 and paid full price for it.
    - **TL data**: `tl brands find` + category + product description, plus
      `scripts/brand_reads.py` — the recency-ordered ad-read sample (weight
      the newest era; an old read can describe a dead product or CTA). Search
@@ -373,18 +451,48 @@ incremental round,
    - **Brand social**: the brand's own Instagram/X/TikTok — campaign themes,
      how they use creators, and the brand's personal surface (founder story,
      office dog, a championed cause). Connections run both directions.
-2. **Connection pass.** Put the facts ledger next to the brand read. Three
-   types — **direct** (fact ↔ product), **adjacent** (lifestyle fit),
-   **category precedent** (one channel-scoped probe of brand-category terms
-   for moments the creator already does what the product enables). Follow-up
-   queries are **confirm-only**: they deepen a candidate connection, never
-   invent one. Write the map as a working file,
+   - **Category precedent probe** (the fifth agent, and the one that used to
+     run late): a channel-scoped search of the transcript corpus for the
+     moments the creator already does what the product enables, without ever
+     naming the brand. **It works out its own search terms from the brand and
+     its category** — deciding which terms are worth probing IS the judgment
+     here, so never hand it a fixed keyword list. It returns the term counts
+     over the channel's transcribed videos plus the strongest few windows with
+     their `&t=` links, titles, dates and view counts, and it is
+     **confirm-only**: it deepens a candidate connection, never invents one.
+     Save its reply as `<corpus>/category-probe.json`; step 2 reads that file
+     rather than spawning anything.
+2. **Connection pass.** Put the facts ledger next to the brand read and
+   `<corpus>/category-probe.json`. Three types — **direct** (fact ↔ product),
+   **adjacent** (lifestyle fit), **category precedent** (the probe's moments,
+   where the creator already does what the product enables). Follow-up queries
+   are **confirm-only**: they deepen a candidate connection, never invent one.
+
+   Write the map as a working file,
    `tl-creator-profiles/.corpus/<id>/connections-<brand>.md`, per
-   `references/profile-spec.md`: first one `## About <brand>` section (two or
-   three neutral sentences from the web/social lanes and the public category
-   — never sponsorship patterns, never a price), then one `## ` section per
-   connection, strongest first, the type as a bold tag on the heading. Then
-   render the deliverable:
+   `references/profile-spec.md`. **One deliverable per creator plus brand, no
+   second file.** The section contract, in this order:
+
+   - `## About <creator name>` — two or three sentences on who they are, in
+     prose, from the ledger. Not a fact list; the renderer has the ledger for
+     that.
+   - `## Thesis` — the core of the page. Why these two fit, in three or four
+     sentences, written well enough to be read aloud in a meeting. It leads,
+     above the brand introduction, because the reader wants the argument
+     before the background.
+   - `## About <brand name>` — two or three neutral sentences from the
+     web/social lanes and the public category. Never sponsorship patterns,
+     never a price.
+   - One `## ` section per connection, strongest first, the type as a bold tag
+     on the heading. Section order IS the ranking.
+   - `## Where this could go wrong` — the honest mismatch, last. **Always
+     present, even on a strong fit.** A creator who talks constantly about
+     fear of AI replacing people, paired with an AI upskilling brand, carries
+     that warning on the page. Honest mismatch beats overfitting to a perfect
+     match, and the renderer keeps it out of the numbered connections so it
+     never reads as an angle.
+
+   Then render the deliverable:
 
    ```bash
    python3 scripts/build_html.py \
@@ -404,7 +512,15 @@ incremental round,
 
 - **Read-only.** Nothing is sent to anyone; output comes back for review.
 - **No prices, costs, rate cards or deal terms in any output**, ever.
-- **Not ad copy.** Connection material, not words to read aloud.
+- **One illustrative sample read per connection, clearly labelled — and
+  nothing more.** This replaces the older blanket "not ad copy" rule. A
+  connection card may carry ONE short **Sample read** line showing how the
+  angle could sound in the creator's own register, marked as an illustration
+  and never as approved copy. It is there so the reader can see the angle
+  land, not so anyone reads it aloud as written. Everything else on the page
+  stays connection material: no scripts, no full reads, no CTA wording, no
+  alternate versions, and the price, cost and deal-term bans above are
+  untouched.
 - **Sensitivity is a tier, not a flag** (`evidence-rules.md`): every fact
   carries `none` | `lifestyle` | `clinical` | `children` | `location`.
   Beliefs are not sensitive. Only `clinical`, `children` and `location` are
