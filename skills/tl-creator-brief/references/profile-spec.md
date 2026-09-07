@@ -252,9 +252,11 @@ holds, in this order:
 
 1. **The creator's own words** (or the social/web fact, labelled as such) —
    verbatim, timestamped, from the ledger, as a `>` quote with its `&t=`
-   link. These are what the page's quote-bridge strip is built from, so they
-   carry the connection: pick the line that makes the fit obvious, not the
-   longest one.
+   link. The quote is the card's evidence and appears nowhere else on the
+   page, so it carries the connection on its own: pick the line that makes
+   the fit obvious, not the longest one. The renderer requires a timestamped
+   link INSIDE the blockquote, so put the attribution on a `>` continuation
+   line, not below the quote.
 2. **What the brand offers that meets it**, and which brand-read lane that
    came from (`[web]`, `[social: instagram]`, ad-read sample, sponsorship
    patterns).
@@ -310,19 +312,15 @@ in for a legacy headerless ledger). Top to bottom:
    badge; superseded facts stay in the ledger only.
 3. **The thesis** — the markdown's `## Thesis` section, rendered as the
    page's lead block, above the brand. This is what the reader came for.
-4. **In their own words** — the quote-bridge strip: the strongest verbatim
-   quote from each connection section, with its `&t=` link, gathered in one
-   place so the evidence reads as evidence before the argument is made about
-   it.
-5. **About the brand** — the markdown's `## About <brand>` section, as prose.
-6. **Connections** — one numbered card per connection section with its type
+4. **About the brand** — the markdown's `## About <brand>` section, as prose.
+5. **Connections** — one numbered card per connection section with its type
    badge, each carrying its quote, what the brand offers, the use case, the
    optional labelled sample read, and the do / do-not pair. Provenance labels
    in the markdown are kept: a connection map names its lanes. A no-fit map
    renders its verdict as prose, no cards.
-7. **Where this could go wrong** — its own block after the cards, never
+6. **Where this could go wrong** — its own block after the cards, never
    numbered among them, so an honest mismatch is never mistaken for an angle.
-8. **About this ledger** — the honesty strip the old ledger view carried:
+7. **About this ledger** — the honesty strip the old ledger view carried:
    fact count with confidence tallies; sensitivity tiers with the count
    withheld from angles (`clinical` counts as withheld only below three
    videos, per `evidence-rules.md`); the coverage line —

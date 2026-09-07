@@ -186,7 +186,11 @@ prints a `FUNNEL` line; the details live in `references/transcript-mining.md`.
 
    It asks the index for the transcript passages around first-person cue
    phrases (`references/cue-phrases.txt`) and writes ranked, capped batches of
-   25 windows plus a passage-only `corpus.jsonl.gz`. Measured: 7–25 s on
+   25 windows plus a passage-only `corpus.jsonl.gz`. **`--out` names the
+   PARENT** — the channel id is appended, so the corpus lands at
+   `<out>/<channel>/` and a path that already ends in the channel id nests it
+   twice. Leave it at the default unless you mean to relocate the whole
+   corpus tree. Measured: 7–25 s on
    channels up to a few hundred matched videos, 36–54 s when 700–1,200 videos
    match a cue — the clock follows matched videos, not the upload count.
    **The fetch never waits for anything.** When
@@ -411,7 +415,7 @@ FUNNEL stage=fetch_cues round=… videos_with_transcript=… videos_matched=… 
 FUNNEL stage=extract batches=… agents=… windows=… gems=… elapsed_s=…   ← you print this one
 FUNNEL stage=assemble windows_expected=… windows_assembled=… gems=… unjudged=… coverage=… elapsed_s=…
 FUNNEL stage=cluster gems=… clusters=… merged=… elapsed_s=…
-FUNNEL stage=merge clusters=… judged=… auto_dropped=… additive=… facts=… folded=… dropped=… selected=… identity_facts=… domain_aliases=… elapsed_s=…
+FUNNEL stage=merge clusters=… judged=… auto_dropped=… additive=… facts=… folded=… dropped=… selected=… identity_facts=… enum_aliases=… elapsed_s=…
 FUNNEL stage=verify candidates=… verified=… rejected=… passed_through=… elapsed_s=…
 ```
 
@@ -573,6 +577,18 @@ incremental round,
      --in tl-creator-profiles/.corpus/<id>/connections-<brand>.md \
      --facts tl-creator-profiles/<id>-facts.jsonl
    ```
+
+   **Two things the renderer requires of the markdown, and rejects it
+   without.** Run `build_html.py --check` first: it validates the map against
+   the page contract, exits 3 listing what is wrong, and writes nothing.
+   - **YAML frontmatter**, or the page titles itself "<Creator> × Brand":
+     `schema`, `channel_id`, `channel_name`, `brand_id`, `brand_name`,
+     `facts_file`, `brand_read_date` (`references/profile-spec.md`, Mode B).
+   - **A timestamped link INSIDE each connection's blockquote.** The check
+     looks for a `&t=` href within the `>` block, so the attribution goes on
+     a `>` continuation line. A link on the line *below* the quote renders
+     fine and fails the check on every card — a measured run lost a full
+     rewrite of the map to exactly this.
 
    That writes `tl-creator-profiles/<id>-<brand>-connections.html` — the only
    file a CONNECT run adds to the deliverable directory. It opens with **who

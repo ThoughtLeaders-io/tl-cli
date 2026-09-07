@@ -108,12 +108,36 @@ DOMAIN_ALIASES = {
     "fitness": "health", "wellness": "health",
     "food": "tastes", "preferences": "tastes",
     "partner": "relationships", "marriage": "relationships",
-    "childhood": "origin", "background": "origin",
+    "childhood": "origin", "background": "origin", "history": "origin",
     "finances": "money",
 }
 SENSITIVITY = {"none", "lifestyle", "clinical", "children", "location"}
 WITHHELD = {"clinical", "children", "location"}
 CONFIDENCE = {"confirmed", "unconfirmed"}
+# Sensitivity near-misses. An alias may only ever move a value to a MORE
+# protective tier: raising "medical" to `clinical` withholds a fact that would
+# otherwise have been usable, which is the safe direction to be wrong in.
+# Nothing aliases INTO "none", because that would strip protection from a fact
+# the lane was trying to flag.
+SENSITIVITY_ALIASES = {
+    "medical": "clinical", "health": "clinical", "diagnosis": "clinical",
+    "condition": "clinical", "illness": "clinical",
+    "kids": "children", "child": "children", "kid": "children",
+    "address": "location", "geo": "location", "where": "location",
+    "personal": "lifestyle", "private": "lifestyle",
+}
+# Confidence near-misses. The extractor stage upstream grades a passage
+# `confirmed` / `likely` / `unconfirmed`, and the merge agent carries its
+# vocabulary downstream into a field that holds only two of those words. Every
+# alias here resolves DOWNWARD to `unconfirmed`: a near-miss must never promote
+# a fact to `confirmed`, because cross-lane corroboration is the only thing
+# that earns the top tier (`evidence-rules.md`).
+CONFIDENCE_ALIASES = {
+    "likely": "unconfirmed", "probable": "unconfirmed",
+    "possible": "unconfirmed", "unclear": "unconfirmed",
+    "uncertain": "unconfirmed", "unverified": "unconfirmed",
+    "partial": "unconfirmed", "weak": "unconfirmed",
+}
 ACTIONS = {"keep", "fold", "drop"}
 # The identity lane. `evidence-rules.md`: lanes never masquerade as each other,
 # so a social/web fact names its source and seen-date and carries no quote,
@@ -528,22 +552,58 @@ def load_decisions(paths: list[str]) -> tuple[dict[str, dict], list[str],
     return decisions, selected, identity, problems
 
 
-def alias_identity_domains(identity: list[dict]) -> list[str]:
-    """Rewrite near-miss domain labels on identity-lane facts to the enum, in
-    place. Returns one ``ref: was -> now`` note per rewrite so the caller can
-    report them: a correction nobody sees is how a lane keeps getting it
-    wrong. A label with no single sensible target is left alone for
-    ``validate`` to reject with the allowed list."""
+def _alias_field(rec: dict, field: str, allowed: set[str],
+                 aliases: dict[str, str], label: str) -> str | None:
+    """Rewrite one near-miss enum value in place. Returns a
+    ``label.field: was -> now`` note, or None when there was nothing to do."""
+    got = rec.get(field)
+    if not isinstance(got, str) or got in allowed:
+        return None
+    now = aliases.get(got.strip().lower())
+    if not now:
+        return None
+    rec[field] = now
+    return f"{label}.{field}: {got} -> {now}"
+
+
+def alias_enums(decisions: dict[str, dict], identity: list[dict]) -> list[str]:
+    """Rewrite near-miss enum values to the enum, in place, before ``validate``
+    sees them. Returns one ``ref.field: was -> now`` note per rewrite so the
+    caller can report them: a correction nobody sees is how a lane keeps
+    getting it wrong. A value with no single sensible target is left alone for
+    ``validate`` to reject with the allowed list.
+
+    Two stages reach for words the enums do not carry, and prose in the prompt
+    has not stopped either. The socials lane writes its own ``facts`` records
+    rather than judging clusters, so it invents domain labels ("hobbies",
+    "gear", "history"). The merge agent carries the extractor's confidence
+    vocabulary downstream ("likely"), which cost a measured run a 123 s
+    re-ask. Both are near-misses with exactly one sensible target, so they are
+    normalised here rather than argued with in the prompt."""
     notes: list[str] = []
+    # Only `confidence` is aliased on the decision path, and deliberately not
+    # `tier`: the merge agent judges against a rubric that states the five
+    # tiers, and its tier vocabulary has never drifted, so a wrong tier there
+    # should still fail loudly. The confidence field is different — it is the
+    # extractor's own vocabulary arriving one stage late.
+    for key, dec in sorted(decisions.items()):
+        if not isinstance(dec, dict):
+            continue
+        note = _alias_field(dec, "confidence", CONFIDENCE,
+                            CONFIDENCE_ALIASES, key)
+        if note:
+            notes.append(note)
     for i, rec in enumerate(identity):
-        got = rec.get("domain")
-        if not isinstance(got, str) or got in DOMAINS:
+        if not isinstance(rec, dict):
             continue
-        now = DOMAIN_ALIASES.get(got.strip().lower())
-        if not now:
-            continue
-        rec["domain"] = now
-        notes.append(f"{rec.get('ref') or f'facts[{i}]'}: {got} -> {now}")
+        label = rec.get("ref") or f"facts[{i}]"
+        for field, allowed, aliases in (
+                ("domain", DOMAINS, DOMAIN_ALIASES),
+                ("sensitivity", SENSITIVITY, SENSITIVITY_ALIASES),
+                ("confidence", CONFIDENCE, CONFIDENCE_ALIASES)):
+            note = _alias_field(rec, field, allowed, aliases, label)
+            if note:
+                notes.append(note)
     return notes
 
 
@@ -845,7 +905,7 @@ def cmd_expand(a: argparse.Namespace) -> int:
     by_c = {r["c"]: r for r in records}
 
     decisions, agent_selected, identity, problems = load_decisions(a.decisions)
-    domain_aliases = alias_identity_domains(identity)
+    enum_aliases = alias_enums(decisions, identity)
     violations, folds, fallbacks = validate(records, clusters, decisions,
                                             existing_by_id, identity,
                                             a.fallback_original)
@@ -1144,7 +1204,7 @@ def cmd_expand(a: argparse.Namespace) -> int:
         "dropped": dropped,
         "selected": len(chosen),
         "identity_facts": len(identity_ids),
-        "domain_aliases": domain_aliases,
+        "enum_aliases": enum_aliases,
         "corroborated": corroborated,
         "reconciled": reconciled,
         "superseded": sum(1 for f in facts if f.get("superseded_by")),
@@ -1159,10 +1219,10 @@ def cmd_expand(a: argparse.Namespace) -> int:
            auto_dropped=auto_dropped, additive=len(additive),
            facts=len(facts), folded=len(terminal), dropped=dropped,
            selected=len(chosen), identity_facts=len(identity_ids),
-           domain_aliases=len(domain_aliases), elapsed_s=elapsed)
-    if domain_aliases:
-        print("identity-lane domains aliased to the enum: "
-              + "; ".join(domain_aliases), file=sys.stderr)
+           enum_aliases=len(enum_aliases), elapsed_s=elapsed)
+    if enum_aliases:
+        print("near-miss enum values aliased: "
+              + "; ".join(enum_aliases), file=sys.stderr)
     return 0
 
 

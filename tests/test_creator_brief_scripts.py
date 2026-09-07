@@ -708,12 +708,11 @@ def _check_conn(tmp_path: Path, md: str, name: str = "42-7-connections.md"):
     return proc.returncode, json.loads(proc.stdout)
 
 
-def test_the_page_puts_the_thesis_and_the_quotes_above_the_brand(tmp_path):
+def test_the_page_puts_the_thesis_above_the_brand(tmp_path):
     html = _render_conn(tmp_path, _FULL_MD)
-    # the reader wants the argument and its evidence before the background
+    # the reader wants the argument before the background
     order = [html.index(x) for x in ('<h2>Who they are</h2>',
                                      '<h2>The thesis</h2>',
-                                     '<h2>In their own words</h2>',
                                      '<div class="about"><h3>About Acme</h3>',
                                      '<h2>Connections</h2>')]
     assert order == sorted(order)
@@ -724,11 +723,21 @@ def test_the_page_puts_the_thesis_and_the_quotes_above_the_brand(tmp_path):
     assert "About Patterrz" not in conn
 
 
-def test_the_quote_bridge_strip_carries_each_connections_first_quote(tmp_path):
+def test_each_quote_appears_once_inside_its_own_card(tmp_path):
+    """The page used to repeat every card's strongest quote in an "In their
+    own words" strip above the brand. Removed: a quote read twice is not
+    read twice as hard, and the card is where it carries its connection."""
     html = _render_conn(tmp_path, _FULL_MD)
-    bridges = html.split('<div class="bridges">')[1].split("</div>")[0]
-    assert "we finally adopted luna" in bridges
-    assert 'href="https://youtube.com/w?v=abc&amp;t=12s"' in bridges
+    assert "In their own words" not in html
+    assert 'class="bridges"' not in html
+    # nothing repeats a card's quote above the brand any more
+    above_brand = html.split('<div class="about"><h3>About Acme</h3>')[0]
+    assert "we finally adopted luna" not in above_brand.split(
+        '<h2>The thesis</h2>')[1]
+    # the quote still renders, once, inside its own card, with its link
+    cards = html.split('<h2>Connections</h2>')[1]
+    assert cards.count("we finally adopted luna") == 1
+    assert cards.count('href="https://youtube.com/w?v=abc&amp;t=12s"') == 1
 
 
 def test_the_caveat_is_kept_but_never_numbered_among_the_connections(tmp_path):

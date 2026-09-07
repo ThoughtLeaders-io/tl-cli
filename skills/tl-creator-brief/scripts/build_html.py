@@ -215,8 +215,6 @@ header { padding-bottom: 1.4rem; border-bottom: 1px solid var(--line); }
   margin: 0 0 1.4rem;
 }
 .thesis p { font-size: 1.08rem; line-height: 1.6; max-width: 68ch; }
-.bridges { margin: 0 0 1.4rem; }
-.bridges blockquote { margin: 0 0 .7rem; }
 .caveat {
   border: 1px solid var(--line); border-left: 3px solid var(--ink-3);
   padding: .8rem 1rem; margin: 1rem 0 1.6rem; background: var(--surface);
@@ -456,22 +454,6 @@ def caveat_block(sections: list[tuple[str, str]]) -> str:
 
 
 _BLOCKQUOTE = re.compile(r"<blockquote>.*?</blockquote>", re.S)
-
-
-def quote_bridges(sections: list[tuple[str, str]]) -> str:
-    """The quote-bridge strip: the first verbatim quote from each connection,
-    gathered in one place so the evidence reads as evidence before any
-    argument is made about it. Sections carry their quotes as ``>`` blocks, so
-    the strongest one is the first."""
-    quotes = []
-    for _, rest in sections:
-        m = _BLOCKQUOTE.search(rest)
-        if m:
-            quotes.append(m.group(0))
-    if not quotes:
-        return ""
-    return ('<h2>In their own words</h2>'
-            f'<div class="bridges">{"".join(quotes)}</div>')
 
 
 def connection_cards(sections: list[tuple[str, str]], intro: str = "") -> str:
@@ -813,7 +795,6 @@ def render_connections(md_text: str, facts: list[dict] | None, meta: dict) -> tu
         about_block(creator_about))
     body_out = (who
                 + thesis_block(thesis)
-                + quote_bridges(conns)
                 + about_block(brand_about)
                 + ("<h2>Connections</h2>" if conns or intro else "")
                 + connection_cards(conns, intro)

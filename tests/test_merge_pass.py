@@ -1049,13 +1049,58 @@ def test_near_miss_identity_domains_are_aliased_and_reported(tmp_path):
     assert proc.returncode == 0, proc.stdout + proc.stderr
     summary = json.loads(proc.stdout)
     assert summary["identity_facts"] == 3
-    assert summary["domain_aliases"] == ["s1: hobbies -> habits",
-                                         "s2: identity -> other",
-                                         "s3: career -> work"]
+    assert summary["enum_aliases"] == ["s1.domain: hobbies -> habits",
+                                       "s2.domain: identity -> other",
+                                       "s3.domain: career -> work"]
     # the correction is announced; a silent rewrite is how a lane stays wrong
-    assert "aliased to the enum" in proc.stderr
+    assert "near-miss enum values aliased" in proc.stderr
     assert {f["domain"] for f in _facts(out).values()
             if f.get("source_url")} == {"habits", "other", "work"}
+
+
+def test_history_is_aliased_to_origin(tmp_path):
+    """A live socials run emitted `history`, which the enum does not carry."""
+    clustered = _write_clusters(tmp_path, [_cluster("one")])
+    dpath = _envelope(tmp_path, {"c001": {"action": "keep"}},
+                      facts=[_identity(ref="s1", domain="history")])
+    out = tmp_path / "facts.jsonl"
+    proc = _expand(clustered, dpath, out)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert json.loads(proc.stdout)["enum_aliases"] == \
+        ["s1.domain: history -> origin"]
+
+
+def test_a_likely_confidence_is_aliased_down_to_unconfirmed(tmp_path):
+    """The extractor grades passages `likely`; the ledger holds only
+    confirmed/unconfirmed. A measured run lost 123 s to a re-ask over this."""
+    clustered = _write_clusters(tmp_path, [_cluster("one")])
+    dpath = _envelope(
+        tmp_path, {"c001": {"action": "keep", "confidence": "likely"}})
+    out = tmp_path / "facts.jsonl"
+    proc = _expand(clustered, dpath, out)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert json.loads(proc.stdout)["enum_aliases"] == \
+        ["c001.confidence: likely -> unconfirmed"]
+    assert {f["confidence"] for f in _facts(out).values()} == {"unconfirmed"}
+
+
+def test_no_confidence_alias_can_promote_a_fact_to_confirmed():
+    """Every confidence alias resolves downward: cross-lane corroboration is
+    the only thing that earns `confirmed`."""
+    assert set(merge_pass.CONFIDENCE_ALIASES.values()) == {"unconfirmed"}
+    # and no sensitivity alias may strip protection by landing on "none"
+    assert "none" not in set(merge_pass.SENSITIVITY_ALIASES.values())
+
+
+def test_a_near_miss_sensitivity_is_aliased_on_an_identity_fact(tmp_path):
+    clustered = _write_clusters(tmp_path, [_cluster("one")])
+    dpath = _envelope(tmp_path, {"c001": {"action": "keep"}},
+                      facts=[_identity(ref="s1", sensitivity="medical")])
+    out = tmp_path / "facts.jsonl"
+    proc = _expand(clustered, dpath, out)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert json.loads(proc.stdout)["enum_aliases"] == \
+        ["s1.sensitivity: medical -> clinical"]
 
 
 def test_an_unplaceable_identity_domain_still_exits_3(tmp_path):

@@ -366,7 +366,10 @@ def derived_batch_size(windows: int, agent_cap: int) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--channel", type=int, required=True)
-    ap.add_argument("--out", default="tl-creator-profiles/.corpus")
+    ap.add_argument("--out", default="tl-creator-profiles/.corpus",
+                    help="PARENT directory for the corpus; the channel id is appended, "
+                         "so the run writes <out>/<channel>/. Passing a path that already "
+                         "ends in the channel id nests it twice")
     ap.add_argument("--phrases", default=str(DEFAULT_PHRASES))
     ap.add_argument("--host-terms", default="")
     ap.add_argument("--max-windows", type=int, default=500)
