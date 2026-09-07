@@ -385,10 +385,12 @@ high-volume evergreen term (large recent reach, small share, e.g. `annuity`:
 ## Counts + samples in ONE query (no highlight)
 
 `track_total_hits: true` gives the full count even with a small `size`; `size: N`
-returns the top-N (by `_score`) docs. **The `tl db es` CLI strips the ES
-`highlight` block**, so don't rely on it — return the `_source` fields you need
-for validation instead (title/summary for articles; `name`/`ai.topic_descriptions`
-for channels). The response is `{results: [...rows with _source flattened...],
+returns the top-N (by `_score`) docs. The probe scripts don't request ES
+`highlight` — they return the `_source` fields needed for validation instead
+(title/summary for articles; `name`/`ai.topic_descriptions` for channels).
+Highlight fragments are available behind the `--highlight` flag; its behaviour
+(output shape, transcript XML fragments, billing) is documented once under
+*`tl db es`* in the `tl` skill's `SKILL.md`. The response is `{results: [...rows with _source flattened...],
 total: <int>, usage: {...}}`.
 
 ```json

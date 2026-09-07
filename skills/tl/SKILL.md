@@ -453,7 +453,12 @@ tl db es '{"size":0,"track_total_hits":true,"query":{"term":{"sponsored_brand_me
 
 # Pipe a larger body
 cat query.json | tl db es -
+
+# Keep ES highlight fragments in each result row (needs a `highlight` clause in the body)
+tl db es '{"query":{"match_phrase":{"transcript":"vpn"}},"highlight":{"fields":{"transcript":{}}}}' --highlight
 ```
+
+**`--highlight`**: without the flag, result rows carry only `_id`, `_score`, and the `_source` fields, even when the body has a `highlight` clause. With it, each row also carries the ES `highlight` block. `transcript` fragments come back as timed-text XML (`<text start="…">` cues), so strip tags before windowing. Premium-field billing applies to the fragments shipped, and free-tier orgs get gated fields stripped from highlight blocks.
 
 See [references/elasticsearch-schema.md](references/elasticsearch-schema.md) for accepted top-level keys, query types, size/depth limits, scripting/aggregation rules, and the field catalogue.
 

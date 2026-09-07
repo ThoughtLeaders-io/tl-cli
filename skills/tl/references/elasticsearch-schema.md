@@ -27,7 +27,7 @@ See the output of `tl db es`" for the object schema. Highlights:
 - **Accepted query types** include `term`/`terms`/`match`/`bool`/`nested`/`range`/`exists`/`match_phrase`/`simple_query_string` (the sanctioned rich-Boolean text surface — `+` required, `|` OR, `-` NOT, `"phrase"`, `"phrase"~N` slop, trailing-`*` prefix, `~N` fuzzy, `(...)` grouping, per-field `^boosts`; always set `default_operator: "and"` and an explicit `fields` list or counts balloon). `query_string`, `regexp`, `wildcard`, `fuzzy`, `more_like_this`, `has_child`, `has_parent`, `parent_id` are not accepted.
 - **No scripts** — keys that start with `script` (e.g. `script_fields`, `script_score`, `scripted_metric`) or end with `_script` (e.g. `bucket_script`) are not accepted. A field whose name merely contains `script` as a substring (e.g. `transcript`, `description`) is fine.
 - **Aggregations are bounded, not forbidden**: up to ~50 agg nodes per body, bucket nesting ≤ 3 levels deep (single-bucket framing aggs like `filter`/`nested`/`missing` count toward depth), terms-like bucket `size` ≤ 10,000, and a worst-case total bucket count cap — so a `filter` agg wrapping a `cardinality` (the common counts-plus-recency shape) is fine in one call. Heavy/experimental agg types (e.g. `significant_terms`, script-based pipeline aggs) are not accepted.
-- **`highlight` is accepted in the body but highlight fragments are not returned** — result rows carry only `_id`, `_score`, and the `_source` fields. Request the `_source` fields you need for validation samples instead.
+- **`highlight`** is accepted in the body; whether fragments come back is a CLI flag — see `--highlight` under *`tl db es`* in [../SKILL.md](../SKILL.md).
 
 ### ElasticSearch document structure ("articles")
 

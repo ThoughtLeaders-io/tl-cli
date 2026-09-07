@@ -65,7 +65,7 @@ verbatim via `search_channels.py --group` / `search_videos.py --group`.
 > covers the article-vs-channel doc types, the content fields (and ES's
 > **legacy** channel field names), `simple_query_string` Boolean syntax,
 > tokenization, the report-link keyword grammar, and why we return `_source`
-> samples (the CLI drops ES `highlight`).
+> samples (ES `highlight` fragments are only returned with `--highlight`).
 
 `<SKILL_DIR>` below is this skill's directory (the one holding `SKILL.md`).
 

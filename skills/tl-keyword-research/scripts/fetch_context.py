@@ -8,8 +8,9 @@ vs. "sports investing" / "investing in your faith").
 
 `transcript` is stored as YouTube caption XML
 (`<?xml ...?><transcript><text start=".." dur="..">cue</text>...`), so tags are
-stripped and entities unescaped before windowing — highlight fragments of it
-would be full of markup anyway. `title` / `summary` are windowed as-is.
+stripped and entities unescaped before windowing. We window whole `_source`
+fields rather than ES highlight fragments (`tl db es --highlight`; see the `tl`
+skill's SKILL.md). `title` / `summary` are windowed as-is.
 
 Usage:
     fetch_context.py --channels 466311,199308 investing
