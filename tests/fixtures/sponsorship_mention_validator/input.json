@@ -1,0 +1,568 @@
+[
+ {
+  "i": 0,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Three nights above the treeline",
+  "hashtags": [
+   "#camping"
+  ],
+  "has_transcript": true,
+  "paid_promotion_flag": true,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.03,
+    "start_ts": 14.8,
+    "snippet": "today's video is sponsored by Rivalco. their TrailPod packs down to the size of a water bottle, and you can get 20% off with code NORTH20 at rivalco.com"
+   },
+   {
+    "field": "summary",
+    "position": 0.05,
+    "snippet": "Get 20% off Rivalco: https://rivalco.com/north (code NORTH20)"
+   }
+  ]
+ },
+ {
+  "i": 1,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "LIVE: gear Q&A from the trailhead",
+  "hashtags": [],
+  "has_transcript": false,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "summary",
+    "position": 0.01,
+    "snippet": "This video is sponsored by Rivalco. 20% off at rivalco.com/north"
+   }
+  ]
+ },
+ {
+  "i": 2,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "What I carry on a 5-day loop",
+  "hashtags": [
+   "#backpacking"
+  ],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "summary",
+    "position": 0.85,
+    "snippet": "Gear I use: Rivalco TrailPod - https://rivalco.com/?ref=northwind"
+   }
+  ]
+ },
+ {
+  "i": 3,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Every tent I have owned, ranked",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.42,
+    "start_ts": 388.0,
+    "snippet": "I bought the Rivalco TrailPod with my own money last spring and honestly the seam leaked on night two"
+   }
+  ]
+ },
+ {
+  "i": 4,
+  "brand": "Element",
+  "aliases": [
+   "Element",
+   "Element Skin",
+   "elementskin.com"
+  ],
+  "channel": "Glow Notes",
+  "title": "Reading the label on a viral serum",
+  "hashtags": [
+   "#skincare"
+  ],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.31,
+    "start_ts": 201.5,
+    "snippet": "the elements in this serum are mostly humectants, glycerin and a bit of hyaluronic acid, nothing exotic"
+   }
+  ]
+ },
+ {
+  "i": 5,
+  "brand": "Element",
+  "aliases": [
+   "Element",
+   "Element Skin",
+   "elementskin.com"
+  ],
+  "channel": "Glow Notes",
+  "title": "My barrier repair routine",
+  "hashtags": [
+   "#skincare"
+  ],
+  "has_transcript": true,
+  "paid_promotion_flag": true,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.04,
+    "start_ts": 22.0,
+    "snippet": "Element sent over their new barrier serum and they're sponsoring today's video, code SKIN15 gets you fifteen percent off at elementskin.com"
+   }
+  ]
+ },
+ {
+  "i": 6,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Storm-testing a one-person tent",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.02,
+    "start_ts": 9.1,
+    "snippet": "this episode is brought to you by rival co. the trail pod is the tent I've used all season, link and code in the description"
+   },
+   {
+    "field": "summary",
+    "position": 0.03,
+    "snippet": "Rivalco: https://rivalco.com/north"
+   }
+  ]
+ },
+ {
+  "i": 7,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Driving to the coast at 4am",
+  "hashtags": [
+   "#vanlife"
+  ],
+  "has_transcript": true,
+  "paid_promotion_flag": true,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.02,
+    "start_ts": 11.0,
+    "snippet": "huge thanks to Bluefin VPN for sponsoring this one. anyway, I packed my old Rivalco pod and we drove up at four in the morning"
+   }
+  ]
+ },
+ {
+  "i": 8,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Solo overnight in the high desert",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.05,
+    "start_ts": 30.2,
+    "snippet": "the TrailPod folks are sponsoring today's episode, so if you want one, the link below gets you 15% off"
+   }
+  ]
+ },
+ {
+  "i": 9,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "The only tent I recommend",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.1,
+    "start_ts": 61.0,
+    "snippet": "this is not sponsored by Rivalco, I just genuinely like the pod and I've had it three years"
+   }
+  ]
+ },
+ {
+  "i": 10,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Camping in the rain, again",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.55,
+    "start_ts": 470.3,
+    "snippet": "Rivalco, if you're watching this, sponsor me, I'll wear the hat"
+   }
+  ]
+ },
+ {
+  "i": 11,
+  "brand": "Northwind",
+  "aliases": [
+   "Northwind",
+   "Northwind Explains",
+   "northwind.store"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Season recap and a big announcement",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "summary",
+    "position": 0.9,
+    "snippet": "Northwind merch: https://northwind.store"
+   }
+  ]
+ },
+ {
+  "i": 12,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Winter layering explained",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "summary",
+    "position": 0.01,
+    "snippet": "This video is a paid partnership with Rivalco. 20% off with my link: rivalco.com/north"
+   }
+  ]
+ },
+ {
+  "i": 13,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Packing for a week in the Cairngorms",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "summary",
+    "position": 0.02,
+    "snippet": "20% off Rivalco with my link: https://rivalco.com/north"
+   }
+  ]
+ },
+ {
+  "i": 14,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Leaving town for the summer",
+  "hashtags": [
+   "#camping",
+   "#ad"
+  ],
+  "has_transcript": true,
+  "paid_promotion_flag": true,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.7,
+    "start_ts": 612.4,
+    "snippet": "we passed a Rivalco billboard on the way out of town, which felt like a sign"
+   }
+  ]
+ },
+ {
+  "i": 15,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "My honest Rivalco TrailPod review (they sent it to me)",
+  "hashtags": [],
+  "has_transcript": false,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "title",
+    "position": 0.2,
+    "snippet": "My honest Rivalco TrailPod review (they sent it to me)"
+   }
+  ]
+ },
+ {
+  "i": 16,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Truck camping the back roads",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.6,
+    "start_ts": 540.0,
+    "snippet": "grabbed my Rivalco pod out of the truck and had it up before the rain started"
+   },
+   {
+    "field": "summary",
+    "position": 0.9,
+    "snippet": "Rivalco is a sponsor of this channel - rivalco.com/north"
+   }
+  ]
+ },
+ {
+  "i": 17,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Why I switched tents",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.5,
+    "start_ts": 300.0,
+    "snippet": "head over to rivalco dot com slash north to start your free trial, that's rivalco dot com slash north"
+   }
+  ]
+ },
+ {
+  "i": 18,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Full kit list, spring 2026",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "summary",
+    "position": 0.95,
+    "snippet": "Tent: https://geni.us/rivalco-trailpod"
+   }
+  ]
+ },
+ {
+  "i": 19,
+  "brand": "Ridge",
+  "aliases": [
+   "Ridge",
+   "Ridge Wallet",
+   "ridge.com"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Traverse day: the long way round",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.4,
+    "start_ts": 250.0,
+    "snippet": "we followed the ridge for two hours before dropping into the valley"
+   }
+  ]
+ },
+ {
+  "i": 20,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Sponsored trip: the northern loop",
+  "hashtags": [
+   "#rivalco",
+   "#camping"
+  ],
+  "has_transcript": true,
+  "paid_promotion_flag": true,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.03,
+    "start_ts": 15.0,
+    "snippet": "before we start, Rivalco is sponsoring this trip, so thanks to them"
+   },
+   {
+    "field": "transcript",
+    "position": 0.5,
+    "start_ts": 410.0,
+    "snippet": "pitched the Rivalco pod again, third night in a row"
+   },
+   {
+    "field": "summary",
+    "position": 0.02,
+    "snippet": "Rivalco: rivalco.com/north"
+   },
+   {
+    "field": "hashtags",
+    "position": 0.0,
+    "snippet": "#rivalco"
+   }
+  ]
+ },
+ {
+  "i": 21,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Rivalco vs Bluefin: which tent survives a storm?",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "title",
+    "position": 0.0,
+    "snippet": "Rivalco vs Bluefin: which tent survives a storm?"
+   }
+  ]
+ },
+ {
+  "i": 22,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Coastal route, day one",
+  "hashtags": [],
+  "has_transcript": false,
+  "paid_promotion_flag": true,
+  "mentions": [
+   {
+    "field": "summary",
+    "position": 0.01,
+    "snippet": "Sponsored by Bluefin VPN. My gear: Rivalco TrailPod https://rivalco.com/?ref=nw"
+   }
+  ]
+ },
+ {
+  "i": 23,
+  "brand": "Rivalco",
+  "aliases": [
+   "Rivalco",
+   "rivalco.com",
+   "TrailPod"
+  ],
+  "channel": "Northwind Explains",
+  "title": "Base camp problems",
+  "hashtags": [],
+  "has_transcript": true,
+  "paid_promotion_flag": false,
+  "mentions": [
+   {
+    "field": "transcript",
+    "position": 0.45,
+    "start_ts": 333.0,
+    "snippet": "and that's exactly where Rivalco comes in. so if you"
+   }
+  ]
+ }
+]

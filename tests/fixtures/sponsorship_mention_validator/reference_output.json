@@ -1,0 +1,392 @@
+[
+ {
+  "i": 0,
+  "label": "paid_read",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "read",
+    "quote": "today's video is sponsored by Rivalco"
+   },
+   {
+    "m": 1,
+    "field": "description",
+    "role": "link"
+   }
+  ],
+  "note": "spoken disclosure, code NORTH20, 20% off"
+ },
+ {
+  "i": 1,
+  "label": "sponsor_credit",
+  "confidence": "high",
+  "evidence_field": "description",
+  "matches": [
+   {
+    "m": 0,
+    "field": "description",
+    "role": "disclosure",
+    "quote": "This video is sponsored by Rivalco"
+   }
+  ],
+  "note": "written disclosure, no captions"
+ },
+ {
+  "i": 2,
+  "label": "affiliate_or_link_only",
+  "confidence": "high",
+  "evidence_field": "description",
+  "matches": [
+   {
+    "m": 0,
+    "field": "description",
+    "role": "link",
+    "quote": "Gear I use: Rivalco TrailPod"
+   }
+  ],
+  "note": "gear-shelf affiliate link, no disclosure"
+ },
+ {
+  "i": 3,
+  "label": "organic",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "passing",
+    "quote": "bought the Rivalco TrailPod with my own money"
+   }
+  ],
+  "note": "self-bought, seam leaked"
+ },
+ {
+  "i": 4,
+  "label": "organic",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "passing",
+    "quote": "the elements in this serum are mostly humectants"
+   }
+  ],
+  "note": "generic word sense, not the brand Element"
+ },
+ {
+  "i": 5,
+  "label": "paid_read",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "read",
+    "quote": "they're sponsoring today's video, code SKIN15"
+   }
+  ],
+  "note": "spoken sponsorship with code"
+ },
+ {
+  "i": 6,
+  "label": "paid_read",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "read",
+    "quote": "this episode is brought to you by rival co"
+   },
+   {
+    "m": 1,
+    "field": "description",
+    "role": "link"
+   }
+  ],
+  "note": "ASR 'rival co' brought-to-you-by read"
+ },
+ {
+  "i": 7,
+  "label": "organic",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "passing",
+    "quote": "thanks to Bluefin VPN for sponsoring this one"
+   }
+  ],
+  "note": "disclosure names Bluefin; Rivalco passing"
+ },
+ {
+  "i": 8,
+  "label": "paid_read",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "read",
+    "quote": "the TrailPod folks are sponsoring today's episode"
+   }
+  ],
+  "note": "product alias sponsoring, 15% off"
+ },
+ {
+  "i": 9,
+  "label": "organic",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "passing",
+    "quote": "this is not sponsored by Rivalco"
+   }
+  ],
+  "note": "explicit not sponsored"
+ },
+ {
+  "i": 10,
+  "label": "organic",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "passing",
+    "quote": "Rivalco, if you're watching this, sponsor me"
+   }
+  ],
+  "note": "wishing for a sponsor"
+ },
+ {
+  "i": 11,
+  "label": "organic",
+  "confidence": "high",
+  "evidence_field": "description",
+  "matches": [
+   {
+    "m": 0,
+    "field": "description",
+    "role": "link",
+    "quote": "Northwind merch: https://northwind.store"
+   }
+  ],
+  "note": "channel's own merch"
+ },
+ {
+  "i": 12,
+  "label": "sponsor_credit",
+  "confidence": "high",
+  "evidence_field": "description",
+  "matches": [
+   {
+    "m": 0,
+    "field": "description",
+    "role": "disclosure",
+    "quote": "This video is a paid partnership with Rivalco"
+   }
+  ],
+  "note": "written paid partnership, no spoken read"
+ },
+ {
+  "i": 13,
+  "label": "affiliate_or_link_only",
+  "confidence": "high",
+  "evidence_field": "description",
+  "matches": [
+   {
+    "m": 0,
+    "field": "description",
+    "role": "offer",
+    "quote": "20% off Rivalco with my link"
+   }
+  ],
+  "note": "offer and link, no disclosure language"
+ },
+ {
+  "i": 14,
+  "label": "organic",
+  "confidence": "medium",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "passing",
+    "quote": "we passed a Rivalco billboard"
+   }
+  ],
+  "note": "#ad on video, brand only passing"
+ },
+ {
+  "i": 15,
+  "label": "sponsor_credit",
+  "confidence": "medium",
+  "evidence_field": "title",
+  "matches": [
+   {
+    "m": 0,
+    "field": "title",
+    "role": "disclosure",
+    "quote": "they sent it to me"
+   }
+  ],
+  "note": "gifted product disclosed in title"
+ },
+ {
+  "i": 16,
+  "label": "sponsor_credit",
+  "confidence": "high",
+  "evidence_field": "description",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "passing"
+   },
+   {
+    "m": 1,
+    "field": "description",
+    "role": "disclosure",
+    "quote": "Rivalco is a sponsor of this channel"
+   }
+  ],
+  "note": "written channel sponsor, spoken mention passing"
+ },
+ {
+  "i": 17,
+  "label": "paid_read",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "read",
+    "quote": "rivalco dot com slash north to start your free trial"
+   }
+  ],
+  "note": "tracked URL and free trial read aloud"
+ },
+ {
+  "i": 18,
+  "label": "affiliate_or_link_only",
+  "confidence": "high",
+  "evidence_field": "description",
+  "matches": [
+   {
+    "m": 0,
+    "field": "description",
+    "role": "link",
+    "quote": "Tent: https://geni.us/rivalco-trailpod"
+   }
+  ],
+  "note": "affiliate redirector, no disclosure"
+ },
+ {
+  "i": 19,
+  "label": "organic",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "passing",
+    "quote": "we followed the ridge for two hours"
+   }
+  ],
+  "note": "generic word sense, a mountain ridge"
+ },
+ {
+  "i": 20,
+  "label": "paid_read",
+  "confidence": "high",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "read",
+    "quote": "Rivalco is sponsoring this trip"
+   },
+   {
+    "m": 1,
+    "field": "transcript",
+    "role": "passing"
+   },
+   {
+    "m": 2,
+    "field": "description",
+    "role": "link"
+   },
+   {
+    "m": 3,
+    "field": "hashtags",
+    "role": "passing"
+   }
+  ],
+  "note": "spoken sponsorship line decides"
+ },
+ {
+  "i": 21,
+  "label": "organic",
+  "confidence": "high",
+  "evidence_field": "title",
+  "matches": [
+   {
+    "m": 0,
+    "field": "title",
+    "role": "passing",
+    "quote": "Rivalco vs Bluefin: which tent survives"
+   }
+  ],
+  "note": "comparison title only"
+ },
+ {
+  "i": 22,
+  "label": "affiliate_or_link_only",
+  "confidence": "high",
+  "evidence_field": "description",
+  "matches": [
+   {
+    "m": 0,
+    "field": "description",
+    "role": "link",
+    "quote": "My gear: Rivalco TrailPod https://rivalco.com/?ref=nw"
+   }
+  ],
+  "note": "Bluefin is the sponsor; Rivalco affiliate link"
+ },
+ {
+  "i": 23,
+  "label": "unclear",
+  "confidence": "low",
+  "evidence_field": "transcript",
+  "matches": [
+   {
+    "m": 0,
+    "field": "transcript",
+    "role": "read",
+    "quote": "that's exactly where Rivalco comes in"
+   }
+  ],
+  "note": "pitch opening cut off before any offer"
+ }
+]

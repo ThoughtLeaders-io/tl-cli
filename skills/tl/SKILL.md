@@ -406,6 +406,16 @@ tl sponsorships update "$sid" '{
 tl sponsorships show "$sid" --json | jq '{id, status, rejection_reason}'
 ```
 
+### Verifying brand mentions at scale
+
+Tagged sponsorship mentions and keyword hits are candidates, not verdicts: a brand name that is also an ordinary word (Element, Prime, Ridge) or a passing reference will sit next to real paid reads. Before a list of (video, brand) hits goes into a report, verify it with the `sponsorship-mention-validator` agent. In Claude Code it is a bundled sub-agent (launch it with the Agent tool); on any other agent, hand a sub-task the body of `agents/sponsorship-mention-validator.md` from the CLI repo as its instructions.
+
+1. Build one item per (video, brand) with **every** mention of that brand in that video (field, position, snippet), the full alias list from `tl brands show`, `has_transcript`, and a unique `i`.
+2. Split into batches of 20–40 items, write each to a JSON file, and launch one `sponsorship-mention-validator` per batch in parallel, naming an output file for each.
+3. Merge and contract-check the batches with this skill's `scripts/merge_mention_verdicts.py --input candidates.json --verdicts batch-*.json --merged verdicts.json`. It rejects malformed batches, prints label counts, and lists the `unclear` / low-confidence items for a full-context second pass.
+
+Labels come back as `paid_read`, `sponsor_credit`, `affiliate_or_link_only`, `organic`, or `unclear`, each with the deciding quote, so a verdict can be audited rather than trusted.
+
 ### Raw queries (`tl db`)
 
 `tl db pg|fb|es` is the default tool. Use it to reach any database records needed.

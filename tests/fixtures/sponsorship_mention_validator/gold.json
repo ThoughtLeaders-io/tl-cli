@@ -1,0 +1,155 @@
+[
+ {
+  "i": 0,
+  "label": "paid_read",
+  "evidence_field": "transcript",
+  "why": "spoken disclosure plus code and offer in the pre-roll"
+ },
+ {
+  "i": 1,
+  "label": "sponsor_credit",
+  "evidence_field": "description",
+  "why": "no captions; written disclosure names the brand"
+ },
+ {
+  "i": 2,
+  "label": "affiliate_or_link_only",
+  "evidence_field": "description",
+  "why": "gear-shelf affiliate link, no disclosure language"
+ },
+ {
+  "i": 3,
+  "label": "organic",
+  "evidence_field": "transcript",
+  "why": "self-bought, critical review"
+ },
+ {
+  "i": 4,
+  "label": "organic",
+  "evidence_field": "transcript",
+  "why": "generic-word sense: 'the elements' is not the brand Element"
+ },
+ {
+  "i": 5,
+  "label": "paid_read",
+  "evidence_field": "transcript",
+  "why": "brand sense of Element with a spoken sponsorship and code"
+ },
+ {
+  "i": 6,
+  "label": "paid_read",
+  "evidence_field": "transcript",
+  "why": "ASR-mangled 'rival co' / 'trail pod' spoken read"
+ },
+ {
+  "i": 7,
+  "label": "organic",
+  "evidence_field": "transcript",
+  "why": "the disclosure names another sponsor; this brand is passing despite paid flag"
+ },
+ {
+  "i": 8,
+  "label": "paid_read",
+  "evidence_field": "transcript",
+  "why": "spoken read under the product alias only"
+ },
+ {
+  "i": 9,
+  "label": "organic",
+  "evidence_field": "transcript",
+  "why": "explicit 'not sponsored by'"
+ },
+ {
+  "i": 10,
+  "label": "organic",
+  "evidence_field": "transcript",
+  "why": "wishing for a sponsorship"
+ },
+ {
+  "i": 11,
+  "label": "organic",
+  "evidence_field": "description",
+  "why": "the channel's own merch"
+ },
+ {
+  "i": 12,
+  "label": "sponsor_credit",
+  "evidence_field": "description",
+  "why": "transcript exists with no read; written paid-partnership disclosure"
+ },
+ {
+  "i": 13,
+  "label": "affiliate_or_link_only",
+  "evidence_field": "description",
+  "why": "offer plus link, no disclosure language"
+ },
+ {
+  "i": 14,
+  "label": "organic",
+  "evidence_field": "transcript",
+  "why": "#ad on the video, but this brand is only a passing mention"
+ },
+ {
+  "i": 15,
+  "label": "sponsor_credit",
+  "also_ok": [
+   "unclear"
+  ],
+  "evidence_field": "title",
+  "why": "gifted product disclosed in writing, no captions; unclear is acceptable"
+ },
+ {
+  "i": 16,
+  "label": "sponsor_credit",
+  "evidence_field": "description",
+  "why": "spoken mention is passing; written channel-sponsor disclosure decides"
+ },
+ {
+  "i": 17,
+  "label": "paid_read",
+  "evidence_field": "transcript",
+  "why": "tracked URL and free-trial offer read aloud, no 'sponsor' word"
+ },
+ {
+  "i": 18,
+  "label": "affiliate_or_link_only",
+  "evidence_field": "description",
+  "why": "bare affiliate redirector to the product"
+ },
+ {
+  "i": 19,
+  "label": "organic",
+  "evidence_field": "transcript",
+  "why": "generic-word sense: a mountain ridge, not Ridge"
+ },
+ {
+  "i": 20,
+  "label": "paid_read",
+  "evidence_field": "transcript",
+  "why": "four mentions; the spoken sponsorship line decides"
+ },
+ {
+  "i": 21,
+  "label": "organic",
+  "evidence_field": "title",
+  "why": "comparison title only",
+  "also_ok": [
+   "unclear"
+  ]
+ },
+ {
+  "i": 22,
+  "label": "affiliate_or_link_only",
+  "evidence_field": "description",
+  "why": "disclosure names Bluefin; this brand is a gear-shelf affiliate link"
+ },
+ {
+  "i": 23,
+  "label": "unclear",
+  "also_ok": [
+   "paid_read"
+  ],
+  "evidence_field": "transcript",
+  "why": "pitch-opening line truncated before any offer; unclear, paid_read acceptable"
+ }
+]
