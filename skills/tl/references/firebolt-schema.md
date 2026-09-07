@@ -63,7 +63,7 @@ Tracks YouTube video metrics over time. Each row = one scrape of one video on on
 
 **Primary Index: `(channel_id, id)`** — queries MUST filter by `channel_id` first.
 
-**Shorts vs Longform:** `duration < 61` = Short. `duration >= 61` = Longform. In code: `(duration or 100) < 61`. Filter client-side after fetching — `duration` isn't an indexed column so it can't go in WHERE.
+**Shorts vs Longform:** `article_metrics` has no `content_type` column, and `duration` cannot stand in for one — YouTube counts uploads up to 180s as Shorts, so any duration cutoff mislabels them. Take the split from Elasticsearch's `content_type` (`longform` / `short` / `live`), matching on the document id `<channel_id>:<video_id>`.
 
 ### `channel_metrics` — Channel-Level Time-Series
 
@@ -158,7 +158,7 @@ tl db fb "SELECT id, age, view_count FROM article_metrics
           ORDER BY id, age"
 ```
 
-For non-indexed filters (`age IN (30, 180)`, `duration > 60`), pull a slightly wider slice and filter in `jq`/Python.
+For non-indexed filters (`age IN (30, 180)`, `view_count > 1000`), pull a slightly wider slice and filter in `jq`/Python.
 
 ## Common Query Patterns
 
@@ -171,15 +171,17 @@ tl db fb "SELECT id, age, view_count, like_count, comment_count, duration
           ORDER BY age"
 ```
 
-### Get all videos for a channel, then filter client-side to milestone ages and longform
+### Get all videos for a channel, then filter client-side to milestone ages
 
 ```bash
 tl db fb "SELECT id, age, view_count, like_count, comment_count, duration, publication_date
           FROM article_metrics
           WHERE channel_id = 12345
           ORDER BY id, age" --json \
-| jq '.results[] | select(.duration > 60 and (.age == 7 or .age == 30 or .age == 60 or .age == 90 or .age == 180 or .age == 365))'
+| jq '.results[] | select(.age == 7 or .age == 30 or .age == 60 or .age == 90 or .age == 180 or .age == 365)'
 ```
+
+To keep longform only, pull `content_type` from Elasticsearch and intersect on video id — Firebolt cannot tell Shorts apart.
 
 ### Channel subscriber/view growth over time
 
