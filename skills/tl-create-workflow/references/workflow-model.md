@@ -35,6 +35,13 @@ Why it matters for building a workflow:
 - **The entry stage should be a QUERY.** It's the pool — the funnel needs a way
   to *find* candidates, and a query does that (e.g. "channels matching this
   topic / these guide-brand look-alikes").
+- **The entry stage IS the query — its own FilterSet holds the criteria.** Do
+  not build stage 1 as an empty list that *links* a saved query report. That
+  isn't a cosmetic compromise: a link resolves to the linked report's *listed*
+  entities and never runs its query (see "Linked reports" below), so the
+  wrapper gets nothing and **stage 1 renders empty**. The in-app **Convert to
+  workflow** flow gets this right by turning the saved query report itself into
+  stage 1.
 - **Every stage after the entry should be a LIST.** Downstream stages are where
   you *move* entities into as they progress. Moving an entity = adding it to the
   target stage's included list. A downstream stage that's a query has nothing to
@@ -61,6 +68,13 @@ Why it matters for building a workflow:
 - A stage can **include or exclude another report's entities** (not just
   individual channels). E.g. a "Reach out" stage that *excludes* a "No email /
   captcha" report so those channels never appear.
+- **A link resolves to the linked report's *listed* entities, not its query
+  results.** The platform reads the explicit channels / brands / articles /
+  sponsorships held on that report and stops there — it never runs the linked
+  report's filters. So linking a **list** report works, and linking a **query**
+  report contributes nothing at all. This is the mechanic behind pitfall 1b:
+  a stage whose only content is a link to a query report has no positive filter,
+  and a workflow stage with no positive filter resolves to **zero rows**.
 - This nests: report A includes report B, which includes report C… There is **no
   hard depth limit in the platform**, and deep chains are a documented
   performance + comprehension trap (exponential resolution on wide/deep nests).

@@ -5,11 +5,17 @@ A workflow is an ordered funnel of report-stages channels/brands move through
 `{name, report_type, steps:[{title, include_report_ids, exclude_report_ids}]}` —
 to the Bearer endpoint `/api/cli/v1/workflows/build`, which builds the whole
 pipeline (stages + linked reports + exclude-earlier chaining) in one atomic call
-and returns the workflow. The result is identical to one built in the web app and
-shows up in its workflow list/detail immediately.
+and returns the workflow. The result shows up in the web app's workflow
+list/detail immediately.
 
-This is the create step of the `tl-create-workflow` skill: design + source the
-entry report, then feed the blueprint here.
+One shape caveat, and it matters: every stage is created with a fresh empty
+FilterSet, and steps accept only report *links*. A link contributes the entities
+explicitly listed on the linked report — it does not run that report's query. So
+linking a LIST report into stage 1 works (its channels land there), but linking a
+QUERY report contributes nothing and stage 1 renders empty. The in-app "Convert to
+workflow" flow (superuser-only) is the only path that makes a saved query report
+itself stage 1. See the `tl-create-workflow` skill: design + source the entry
+report there, then feed the blueprint here.
 """
 
 import json
@@ -63,8 +69,14 @@ def create_workflow(
         }
 
     Only reports you may edit are linked (others are dropped); the workflow is
-    owned by you. The entry stage should link a saved *query* report (see the
-    tl-create-workflow skill); later stages start empty and fill by moving.
+    owned by you. Later stages start empty and fill by moving.
+
+    Note the entry stage: a linked report contributes only the entities listed on
+    it, never its query results. Linking a LIST report (as "Sourced" does above)
+    puts those channels on stage 1. Linking a QUERY report contributes nothing and
+    stage 1 comes out EMPTY — for a live-query entry use "Convert to workflow" in
+    the web app instead, which makes the query report itself stage 1. See the
+    tl-create-workflow skill.
 
     Examples:
         tl workflow create --file blueprint.json

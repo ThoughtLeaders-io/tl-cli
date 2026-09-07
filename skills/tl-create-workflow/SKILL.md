@@ -14,9 +14,10 @@ description: >
   "build an acquisition funnel". It designs the funnel from the goal + the TL
   methodology, sources the entry stage with real data (delegating to
   tl-keyword-research / tl channels / tl recommender / guide-brand research),
-  defines each stage as a query-or-list report, and creates it with
-  "tl workflow create" (or, until the backend endpoint is deployed, hands back the
-  create-ready blueprint + in-app assembly steps). Also answers
+  defines each stage as a query-or-list report (the entry report becomes
+  stage 1 itself), and hands back the create-ready blueprint + in-app Convert
+  steps ("tl workflow create" only for a list entry — a linked query entry
+  renders stage 1 empty). Also answers
   HELP asks about how workflows work ("how do workflows work", "what's a
   query vs a list stage", "explain workflow stages") for free.
 ---
@@ -48,15 +49,55 @@ A workflow is **not a new kind of object** — every stage IS a saved Report
   single most important rule and the #1 cause of broken hand-built workflows —
   see `references/workflow-model.md` (query vs list) and
   `references/pitfalls.md`. Never make stage 2+ a query.
-- **Creating the workflow.** `tl workflow create --file <blueprint.json>` builds
-  it in one call — it POSTs `{name, report_type, steps}` to the Bearer endpoint
-  `/api/cli/v1/workflows/build` (the twin of the web builder). The command ships
-  in this repo; the endpoint ships with backend **PR #4192** — **until that is
-  deployed the command errors**, and the user stands the workflow up in the web
-  app from the blueprint (Convert → Add stage). Both paths are in
-  `references/creating-in-app.md`. **Never claim a workflow was created unless a
-  `tl workflow create` call actually returned one** — otherwise you prepared a
-  blueprint.
+- **The entry stage IS the query — never a list that links one.** The stage-1
+  campaign's **own FilterSet** must hold the filter criteria. Do not model
+  stage 1 as an empty list-stage that *links* a saved query report
+  (`include_report_ids`) — that wraps the query in a needless nesting layer and
+  breaks the stage-1-is-the-query model. You never *design* the wrapped shape;
+  it can only arise as the `tl workflow create` tradeoff below, knowingly
+  accepted by the user. The only creation path that achieves stage-1-as-query
+  today is the in-app **Convert to workflow** flow (the saved query report
+  itself becomes stage 1) — see `references/creating-in-app.md`.
+- **Creating the workflow.** The prescribed path: save the entry **query**
+  report, then the user converts it in the web app (**Convert to workflow** →
+  **Add stage** per downstream stage). `tl workflow create --file
+  <blueprint.json>` exists and works (it POSTs `{name, report_type, steps}` to
+  the Bearer endpoint `/api/cli/v1/workflows/build`, live since 2026-07), but
+  its steps only accept report *links* — it can't put the query on stage 1
+  itself, so it produces the wrapped-entry shape. Prefer Convert whenever the
+  user has it; take the CLI shortcut only on an **informed** okay — name the
+  wrapped-entry shape to them first, because a generic "just create it" or "one
+  command is fine" is not acceptance. Both paths are in
+  `references/creating-in-app.md`. **Never claim a workflow was created unless
+  the user confirmed the in-app conversion or a `tl workflow create` call
+  actually returned one** — otherwise you prepared a blueprint.
+- **A wrapped QUERY entry doesn't just look wrong — it comes out empty.** A
+  linked report contributes only the entities *explicitly listed* on it; the
+  linked report's **query is never run**. So a stage-1 wrapper linking a query
+  report contributes nothing, the stage ends up with no positive filter at all,
+  and a workflow stage with no positive filter resolves to **zero rows** (the
+  platform's guard against an emptied list stage matching the whole index).
+  Stage 1 renders empty. This is why the rule above is a rule and not a
+  preference.
+- **So `tl workflow create` can only build a LIST entry.** Link a list-style
+  report (one holding explicit channels) and stage 1 works — frozen, not live,
+  but populated. Link a query report and stage 1 is empty. Never hand over the
+  second one.
+- **Convert isn't available to everyone — check before you prescribe it.**
+  **Convert to workflow** is a TL-internal menu item (superuser accounts only),
+  and so is `tl bulk-import`. A user without them, who needs a **live query**
+  entry, cannot get a working workflow built today by any route — say so
+  plainly rather than shipping a wrapper that renders empty. Deliver the
+  designed funnel and the populated entry report (both real and useful), and
+  name what's missing: Convert access, or backend step-adoption. Don't send
+  someone hunting for a button that isn't in their menu, and don't paper over
+  the gap with `tl workflow create`.
+- **Convert consumes the entry report.** It doesn't copy — the saved report
+  *becomes* stage 1 and stops being a standalone report. It can't be detached
+  (a workflow's first step can't be deleted), and deleting the workflow deletes
+  its stage reports, entry report included. If the user wants to keep the query
+  as a report in its own right, tell them to **duplicate it first** and convert
+  the copy.
 - **Source with real data, never placeholder channels.** The entry stage must
   be filled from the index (delegate to `tl-keyword-research` /
   `tl channels find` / `tl recommender` / guide-brand research), never a made-up
@@ -73,6 +114,14 @@ If this errors, tell the user to run `tl auth login` (or set `TL_API_KEY`).
 Sourcing stages needs intelligence access on the org's plan; if `tl whoami`
 shows no intelligence flag, say so — you can still design the funnel, but you
 can't populate it from the index.
+
+No `full_access` in `tl whoami` means **Convert to workflow** is definitely not
+in their report menu. `full_access` doesn't guarantee it either (the menu item
+is superuser-only, and full access is the wider group), so if the user says
+they can't find **Convert to workflow** in the report's ⋯ menu, believe them —
+that's the gate, not a mistake. What you do next depends on the entry stage: a
+**list** entry can still be built with `tl workflow create`; a **live query**
+entry can't be built at all without Convert. Say which one they're in.
 
 ## When to invoke / skip
 
@@ -160,6 +209,12 @@ entry — it's fine and correct for it to be a query. Populate it, eyeball the
 count and a sample, and confirm the breadth with the user (too broad → narrow
 the filter; too thin → widen), exactly like keyword-research's breadth check.
 
+This saved query report **becomes stage 1 itself** (via the in-app Convert) —
+it is not a side object that stage 1 links to. Design and name it as the stage
+("Leads", "Sourced"), because its title is the stage title. Converting also
+*consumes* it, so if it doubles as a report the user relies on, have them
+duplicate it and convert the copy.
+
 ### Stage 2 — Define the stages (query first, lists after)
 
 For each downstream stage, the report is a **list**: it starts empty and fills
@@ -196,11 +251,20 @@ so stage 1 exists as a real, openable report before assembly.
 
 ### Stage 4 — Assemble in the web app
 
-Workflows are built in-app (no CLI endpoint). Walk the user through
-`references/creating-in-app.md`:
+The in-app **Convert** flow is the prescribed assembly — it's the only path
+where the entry report becomes stage 1 itself (the CLI's `tl workflow create`
+can only *link* it into a wrapper stage; see `references/creating-in-app.md`).
+It's also **superuser-only**. If the user has no **Convert to workflow** item in
+the report's ⋯ menu, don't walk them through this — and don't substitute
+`tl workflow create` with a query entry, which renders an empty stage 1. Either
+their entry is a list (build it with `tl workflow create`) or they need Convert
+access; tell them which.
+
+Walk the user through it:
 
 1. Open the **entry (Sourced) report** → **Convert to workflow** → name it. That
-   report becomes **stage 1**.
+   report becomes **stage 1** — and stops being a standalone report, so
+   duplicate it first if they still need it as one.
 2. **Add stage** for each downstream stage, in order, with the names from the
    blueprint (they save on the campaign — renames persist).
 3. For any stage with a **linked report** (e.g. exclude "no email"), add it on
@@ -234,12 +298,18 @@ in-app assembly costs nothing (it's the user clicking in the platform).
 2. **Stage 1 is a QUERY and it's populated** from real index data (not a
    placeholder list), with its breadth confirmed against the goal (narrowed /
    widened as needed). **Every stage after 1 is a LIST.** No stage 2+ is a query.
+   And **stage 1 IS the query** — its own filterset holds the criteria; you did
+   not design a list-stage that merely links the query report.
 3. Any **linked reports** are ≤1–2 nesting layers; you preferred a flat stage
    over a deep nest, and flagged per-stage **columns** the team acts on.
 4. The blueprint is **create-ready**: named stages, correct types, the entry
    filter summary + a working **report link**, and the in-app assembly steps.
-5. You were explicit that the **Workflow is assembled in the web app** (the CLI
-   can't create it) — you prepared it, you didn't claim to have created it.
+5. You were explicit about the creation path: **in-app Convert** (prescribed —
+   stage 1 IS the query, superuser-only, and it consumes the entry report) vs
+   `tl workflow create` (usable only for a **list** entry; a linked query entry
+   renders stage 1 empty) — you picked the one the user can actually run, you
+   said so when neither was reachable, and you didn't claim a workflow was
+   created unless one actually was.
 6. You narrated the run and its credit spend, and saved / created **nothing**
    without the user's say-so.
 7. If the user requests a diagram of the funnel, create it as an SVG graphic.
