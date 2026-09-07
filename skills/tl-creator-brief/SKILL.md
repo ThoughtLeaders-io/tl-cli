@@ -58,13 +58,42 @@ listed. Brand (CONNECT only): `tl brands find`; a rebrand returns several IDs
 corpus that cannot be read. An unrecognised value: name it and continue —
 tier names change.
 
-**The gate is bounded.** Run it with `timeout 20 tl whoami --json`. On a
-timeout or a non-zero exit, retry ONCE. If the second attempt also fails, say
-so in one line and **continue the run**: the gate exists to avoid building a
-corpus nobody can read, not to be the reason a run does not happen. Report
+**The gate is bounded.** Run it like this:
+
+```bash
+python3 -c "
+import subprocess, sys
+try:
+    sys.exit(subprocess.run(['tl','whoami','--json'], timeout=20).returncode)
+except subprocess.TimeoutExpired:
+    sys.exit(124)
+"
+```
+
+On a timeout or a non-zero exit, retry ONCE. If the second attempt also fails,
+say so in one line and **continue the run**: the gate exists to avoid building
+a corpus nobody can read, not to be the reason a run does not happen. Report
 `plan gate: unreachable, continued` in the run report so the user knows the
 tier was never confirmed. A measured run lost ~100 s to an unbounded retry
 here.
+
+**Why not `timeout 20 tl whoami --json`.** That was the first attempt at this
+guard and it never executed once. `timeout` is GNU coreutils: standard on
+Linux, absent from macOS, and named `gtimeout` when Homebrew installs it. On a
+Mac the line dies with `command not found` (exit 127) before `tl` is invoked,
+so every run silently took the fallback path and the ~100 s this guard exists
+to recover stayed unrecovered.
+
+The bound also belongs in the command rather than in the host's tool
+parameters. `tl setup gemini`, `tl setup codex` and `tl setup opencode` install
+this skill into other agent hosts, and those hosts read this same SKILL.md
+without offering Claude Code's Bash `timeout` field. A bound written into the
+command works everywhere; a bound living in one host's tool schema disappears
+on the others. `python3` adds no dependency, since every script here is already
+invoked as `python3 scripts/*.py`. `subprocess.run` without `capture_output`
+passes `tl`'s stdout straight through, so the JSON parses exactly as before,
+and exit 124 deliberately matches GNU `timeout`'s convention so the retry logic
+above needs no change.
 
 ## Socials lane — the flag answers it, otherwise ask
 
@@ -476,11 +505,42 @@ incremental round,
      **confirm-only**: it deepens a candidate connection, never invents one.
      Save its reply as `<corpus>/category-probe.json`; step 2 reads that file
      rather than spawning anything.
+
+     Three rules this lane must follow, all three learned from one stall that
+     cost 665 s of agent time against a ~120 s budget and held the whole run
+     open for 8 minutes after every other lane had finished:
+
+     1. **Every query runs in the foreground.** No background jobs, no
+        detached processes, no `run_in_background`, no waiting on a `Monitor`
+        notification. The lane reached for a background job on its own
+        initiative, that query hung, and the agent then returned "waiting for
+        the background term-probe job to complete" **having written no file**.
+        An agent that has stopped cannot be resumed by a notification.
+     2. **Write `category-probe.json` before any optional deepening.** The
+        file is this lane's contract with step 2, so it lands with whatever
+        coverage exists first, and only then may the lane consider probing
+        further. Record honest gaps in `coverage.note`. A file with three
+        terms and a stated gap is worth more than a complete probe that never
+        lands.
+     3. **Cap every query's result size.** The query that hung was unbounded.
+
+     **Step 2 never blocks on this file.** If `category-probe.json` is absent
+     or unreadable, the connection pass proceeds on `direct` and `adjacent`
+     connections alone and says plainly, in the run report and in the page's
+     caveat section, that the category-precedence probe did not land and the
+     map is thinner for it. This lane is the strongest connection type on some
+     pairs, so a missing probe is a real loss worth reporting loudly, but it
+     is never a reason for a finished pipeline to sit and wait.
 2. **Connection pass.** Put the facts ledger next to the brand read and
    `<corpus>/category-probe.json`. Three types — **direct** (fact ↔ product),
    **adjacent** (lifestyle fit), **category precedent** (the probe's moments,
    where the creator already does what the product enables). Follow-up queries
    are **confirm-only**: they deepen a candidate connection, never invent one.
+
+   **Start when the four lanes are in; the probe is a bonus, not a gate.** If
+   `category-probe.json` is missing or unreadable, write the map without
+   `category precedent` connections and say so in the run report and in the
+   page's caveat section. Never wait on it.
 
    Write the map as a working file,
    `tl-creator-profiles/.corpus/<id>/connections-<brand>.md`, per
