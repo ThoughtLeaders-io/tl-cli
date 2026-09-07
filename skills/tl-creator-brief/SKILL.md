@@ -66,26 +66,40 @@ corpus nobody can read, not to be the reason a run does not happen. Report
 tier was never confirmed. A measured run lost ~100 s to an unbounded retry
 here.
 
-## Socials lane — a flag, default OFF
+## Socials lane — the flag answers it, otherwise ask
 
 The identity & socials lane (web search on the creator, their linked
-Instagram/X/about pages actually opened and read) is **opt-in, and it is a
-flag on the invocation, never a question that blocks the run**. Read it from
-the request and start immediately:
+Instagram/X/about pages actually opened and read) is **opt-in**. Take the
+answer from the invocation when it is there, and **ask when it is not**:
 
 - `--socials` / "include socials" / "check their Instagram" / "add web" →
-  lane ON.
-- `--no-socials` / "transcripts only" / "no web" → lane OFF.
-- **Nothing said → lane OFF.** This is the default, not a thing to confirm.
+  lane ON, no question. Say which shape you took and move on.
+- `--no-socials` / "transcripts only" / "no web" → lane OFF, no question.
+- **Nothing said, and the run is interactive → ask**, once, before any fetch,
+  as a single question with the default first:
 
-Never open with `AskUserQuestion` here. The lane is off by default, so asking
-buys a confirmation of the default and costs the run the user's response time;
-a measured run lost 124 s to exactly this. Say which shape you took in the run
-report instead, with "re-run with `--socials`" as the one-line fix. Autonomous,
-scheduled and fast runs are unchanged: lane OFF, nothing asked.
+  > **Run the socials/web identity lane?**
+  > - **No — transcripts only** (default): the creator's own videos are the
+  >   only source. Faster, and every fact carries a timestamped quote.
+  > - **Yes — add socials & web**: also search the web for the creator and
+  >   read their linked profiles, for facts the videos never state and for
+  >   cross-lane confirmation.
 
-Everything below marked *(socials lane ON)* applies only when the flag was
-set.
+- The run is **autonomous / no-pause** (`autonomous`, `--auto`, a scheduled or
+  unattended run) or a **fast run** → lane OFF, nothing asked.
+
+**Never drop the lane silently.** An earlier revision made the flag the only
+input and treated "nothing said" as a settled no, on the reasoning that the
+question merely confirmed the default. That was wrong twice over. The question
+is what tells the operator the lane exists at all, and the time it costs is
+the operator's own response time, which was never inside the fetch-to-page
+figure this skill optimises. It cost a live Airrack run its whole second lane:
+66 transcript facts, no `social`/`web` facts, and no cross-lane corroboration,
+where a socials run on a comparable channel contributed 9 facts and lifted 5
+transcript facts from `unconfirmed` to `confirmed`. The flag exists to skip
+the wait when the answer is already known, not to make silence mean no.
+
+Everything below marked *(socials lane ON)* applies only when the lane is on.
 
 ## Reuse — the found ledger wins
 
