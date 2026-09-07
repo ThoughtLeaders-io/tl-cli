@@ -21,7 +21,7 @@ from tl_cli.client.http import get_client
 from tl_cli.filters import parse_filters
 from tl_cli.output.formatter import detect_format, output, output_single
 
-app = typer.Typer(cls=AlphaSortedTyperGroup, help="Recommender (similarity tags, top-channels/profiles/brands, similarity-profile inspection, profile→channel and channel→brand similarity)")
+app = typer.Typer(cls=AlphaSortedTyperGroup, help="Recommender (similarity tags, top-channels/brands, similarity-profile inspection, profile→channel and channel→brand similarity)")
 
 
 TOP_CHANNEL_COLUMNS = ["value", "channel_id", "channel_name", "slug"]

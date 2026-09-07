@@ -590,7 +590,7 @@ tl brands find "NordVPN"
 
 `tl channels find` resolves spacing/typo variants on its own ("Deco Destiny" → "DecoDestiny") via YouTube lookups and fuzzy similarity matching — no need to retry with hand-made name variations. A real channel that isn't in the index yet gets queued for analysis automatically (the response says to check back in ~24 hours). A plain "Not found" means even YouTube couldn't find it — treat that as the answer.
 
-**Path 2. Curated tag / category / demographic** — user named a topic that maps cleanly to a recommender tag (`"Cooking"`, `"Tech"`, `"USA share"`, content categories, format hints). Use the recommender — it ranks channels by how strongly they load on a tag, returning ranked similarity scores instead of forcing exact equality. It also returns matching brand profiles alongside the channels — useful when the user wants to know "who buys this kind of inventory."
+**Path 2. Curated tag / category / demographic** — user named a topic that maps cleanly to a recommender tag (`"Cooking"`, `"Tech"`, `"USA share"`, content categories, format hints). Use the recommender — it ranks channels by how strongly they load on a tag, returning ranked similarity scores instead of forcing exact equality. It also ranks brands on the same tags (`top-brands`) — useful when the user wants to know "who buys this kind of inventory."
 
 ```bash
 # Discover the available tag name first (free)
@@ -599,7 +599,7 @@ tl recommender tags cooking
 # Discover tag names containing the substring
 tl recommender tags crypto
 
-# Top channels & profiles loaded on a similarity tag (Intelligence)
+# Top channels & brands loaded on a similarity tag (Intelligence)
 tl recommender top-channels "Cooking" msn:yes --limit 50
 tl recommender top-channels "Tech" --limit 30
 tl recommender top-brands "USA share" mbn:yes --limit 50
