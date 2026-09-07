@@ -86,7 +86,7 @@ import sys
 import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from ledger_io import read_ledger, write_ledger  # noqa: E402
+from store_io import read_ledger, write_ledger  # noqa: E402
 
 DOMAINS = {"origin", "family", "pets", "home", "work", "money", "health",
            "habits", "tastes", "beliefs", "relationships", "other"}

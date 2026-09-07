@@ -5,7 +5,7 @@ One machine file per creator: ``<profiles>/<channel_id>-facts.jsonl``, whose
 FIRST line is the meta record (``"schema": "tl-creator-meta/v2"`` — what the
 build was: when, over which videos, what it found) and whose every following
 line is one fact. There is no ``<channel_id>-meta.json`` sidecar any more;
-everything goes through ``scripts/ledger_io.py``.
+everything goes through ``scripts/store_io.py``.
 
 Two subcommands:
 
@@ -25,7 +25,7 @@ Two subcommands:
     credits, channel context) are carried over from the old header.
 
     Counts come from the build's own files — the ledger (facts, counted
-    through ``ledger_io``), the passage store (videos matched, corpus
+    through ``store_io``), the passage store (videos matched, corpus
     window), the windows files (passages), classified.jsonl (windows
     judged), gems.jsonl (gems) and the fetch summaries (videos with
     transcript, latest upload, rounds). Nothing is typed in by hand; a count
@@ -62,7 +62,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "_shared"))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import ledger_io  # sibling script  # noqa: E402
+import store_io  # sibling module  # noqa: E402
 import tl_data  # noqa: E402
 
 SCHEMA = "tl-creator-meta/v2"
@@ -181,7 +181,7 @@ def build_meta(channel: int, profiles_dir: pathlib.Path, corpus_dir: pathlib.Pat
             "passages": passages,
             "windows_judged": windows_judged,
             "gems": gems,
-            "facts": ledger_io.count_facts(facts_path),
+            "facts": store_io.count_facts(facts_path),
         },
         "format": carried["format"],
         "format_evidence": carried["format_evidence"],
@@ -276,7 +276,7 @@ def verified_facts(path: pathlib.Path) -> list[dict]:
     fact must have matched EXACTLY (a partial match is how a fabricated quote
     gets a real timestamp), and the ``verify`` bookkeeping does not belong in
     the ledger. Everything else on the fact — ``members`` included — survives."""
-    _, facts = ledger_io.read_ledger(path)
+    _, facts = store_io.read_ledger(path)
     bad: list[str] = []
     out: list[dict] = []
     for i, fact in enumerate(facts, 1):
@@ -296,7 +296,7 @@ def cmd_write(a: argparse.Namespace) -> int:
     corpus_dir = (pathlib.Path(a.corpus_dir) if a.corpus_dir
                   else profiles / ".corpus" / str(a.channel))
     path = profiles / f"{a.channel}-facts.jsonl"
-    previous = ledger_io.read_ledger(path)[0] if path.exists() else None
+    previous = store_io.read_ledger(path)[0] if path.exists() else None
     if a.from_facts:
         try:
             facts = verified_facts(pathlib.Path(a.from_facts))
@@ -306,14 +306,14 @@ def cmd_write(a: argparse.Namespace) -> int:
                   f"verify_quotes.py: {exc}", file=sys.stderr)
             return 2
         profiles.mkdir(parents=True, exist_ok=True)
-        ledger_io.write_ledger(path, None, facts)      # counted, then headed below
+        store_io.write_ledger(path, None, facts)      # counted, then headed below
     else:
-        facts = ledger_io.read_ledger(path)[1] if path.exists() else []
+        facts = store_io.read_ledger(path)[1] if path.exists() else []
     meta = build_meta(a.channel, profiles, corpus_dir, channel_name=a.channel_name,
                       fmt=a.format, format_evidence=a.format_evidence, rounds=a.rounds,
                       credits_spent=a.credits_spent, lanes=a.lanes,
                       context=load_context(a.context), previous=previous)
-    ledger_io.write_ledger(path, meta, facts)
+    store_io.write_ledger(path, meta, facts)
     print(json.dumps({"ledger": str(path), **meta}, ensure_ascii=False))
     return 0
 
@@ -322,7 +322,7 @@ def cmd_check(a: argparse.Namespace) -> int:
     profiles = pathlib.Path(a.profiles_dir)
     facts_path = profiles / f"{a.channel}-facts.jsonl"
     sidecar = profiles / f"{a.channel}-meta.json"
-    meta = ledger_io.read_ledger(facts_path)[0] if facts_path.exists() else None
+    meta = store_io.read_ledger(facts_path)[0] if facts_path.exists() else None
     if meta is None:
         if not facts_path.exists():
             reason = "no ledger"

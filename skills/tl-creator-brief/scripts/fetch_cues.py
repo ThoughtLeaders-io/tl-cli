@@ -7,20 +7,20 @@ full-transcript scan any more. One boolean ``should`` of ``match_phrase``
 clauses (references/cue-phrases.txt plus the host terms) selects the videos;
 ES ``highlight`` returns the passages around each hit, with the timed-text
 ``start`` attributes intact, so a 5,000-video channel costs a few dozen small
-queries (7-21 s measured, any channel size) instead of a full transcript
-download.
+queries instead of a full transcript download.
 
 Usage:
     fetch_cues.py --channel <id> [--host-terms "a,b"] [--out <root>]
-                  [--max-windows 500] [--batch-size 25]
+                  [--max-windows 500] [--batch-size N] [--reserve N]
+                  [--round N]
                   [--exclude <classified.jsonl>] [--since <YYYY-MM-DD>]
 
 Writes ``<out>/<channel_id>/``: ``windows.jsonl.gz`` (every passage, ranked),
-``batches/batch-NNN.json`` (the capped model-layer batches, 25 windows each)
-and ``corpus.jsonl.gz`` — the same store shape ``verify_quotes.py`` and
-``quote_timestamp.py`` read, holding the fetched passages as cues, so both run
-unchanged. Once the cap is taken, the kept windows' real ad-read spans are
-looked up (``sponsor_spans.py``) and ``in_sponsor_read`` is decided from them;
+``batches/batch-NNN.json`` (the capped model-layer batches, one per extractor
+agent, sized to fill one wave of the host's agent cap) and ``corpus.jsonl.gz``
+— the store shape ``verify_quotes.py`` reads, holding the fetched passages as
+cues. Once the cap is taken, the kept windows' real ad-read spans are
+looked up (``sponsor_segments`` below) and ``in_sponsor_read`` is decided from them;
 the regex heuristic the windows were built with is the fallback when that
 lookup fails, and ``sponsor_source`` in the summary says which one decided.
 One JSON summary on stdout, one FUNNEL line on stderr.
@@ -37,10 +37,10 @@ import pathlib
 import re
 import sys
 import time
+from collections import defaultdict
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "_shared"))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import sponsor_spans  # noqa: E402  — sibling script
 import tl_data  # noqa: E402
 from channel_context import TITLE_SECOND_VOICE  # noqa: E402  — sibling script, one home for title hints
 
@@ -303,6 +303,67 @@ def fetch_year(channel: int, phrases: list[str], year: int, size: int,
             return docs
 
 
+# --------------------------------------------------------------------------- #
+# ad-read spans: a video's sponsored, in-transcript brand mentions carry the
+# seconds the read occupies; only type == sponsored AND field == transcript
+# counts, and a query failure raises (never a silent empty span list).
+# --------------------------------------------------------------------------- #
+SPONSOR_PAD = 75      # an ad read runs past the seconds the detector flags
+IDS_CHUNK = 1000
+ES_CONCURRENCY = 4    # parallel id-chunk fetches for the sponsor-span lookup
+
+
+def _sponsor_chunk(chunk: list[str]) -> dict[str, list[tuple[float, float]]]:
+    """One id-chunk's spans. Any query failure propagates to the caller."""
+    rows = tl_data.db_es({
+        "size": len(chunk),
+        "query": {"ids": {"values": chunk}},
+        "_source": ["id", "brand_mentions"],
+    })
+    out: dict[str, list[tuple[float, float]]] = defaultdict(list)
+    for row in rows:
+        mentions = row.get("brand_mentions") or []
+        if isinstance(mentions, dict):
+            mentions = [mentions]
+        for m in mentions:
+            if m.get("type") != "sponsored" or m.get("field") != "transcript":
+                continue
+            start, end = m.get("start_ts"), m.get("end_ts")
+            if not isinstance(start, (int, float)):
+                continue
+            if not isinstance(end, (int, float)) or end < start:
+                end = start
+            # (0, 0) is a detection with no located position; padded, it
+            # would wrongly claim the opening of the video as an ad read.
+            if start <= 0 and end <= 0:
+                continue
+            out[str(row.get("id"))].append((float(start), float(end)))
+    return out
+
+
+def sponsor_segments(refs: list[str]) -> dict[str, list[tuple[float, float]]]:
+    """Spoken sponsored segments per video, batched over the id list.
+
+    Every mention is re-checked individually: only ``type == "sponsored"`` AND
+    ``field == "transcript"`` counts. A query failure raises — it is never a
+    silent empty span list.
+
+    Id chunks are fetched concurrently, but merged strictly in chunk order and
+    a video's ids never straddle two chunks, so the resulting span lists are
+    the same lists in the same order as a serial fetch.
+    """
+    chunks = [refs[i:i + IDS_CHUNK] for i in range(0, len(refs), IDS_CHUNK)]
+    if not chunks:
+        return {}
+    out: dict[str, list[tuple[float, float]]] = defaultdict(list)
+    with cf.ThreadPoolExecutor(max_workers=min(ES_CONCURRENCY,
+                                            len(chunks))) as pool:
+        for part in pool.map(_sponsor_chunk, chunks):
+            for ref, spans in part.items():
+                out[ref].extend(spans)
+    return dict(out)
+
+
 def apply_sponsor_spans(kept: list[dict]) -> str:
     """Re-decide ``in_sponsor_read`` for the kept windows from real ad-read spans.
 
@@ -322,12 +383,12 @@ def apply_sponsor_spans(kept: list[dict]) -> str:
     if not refs:
         return "none"
     try:
-        segments = sponsor_spans.sponsor_segments(refs)
+        segments = sponsor_segments(refs)
     except BaseException as exc:              # noqa: BLE001 — reported, not raised
         print(f"sponsor-span lookup failed ({type(exc).__name__}: "
               f"{str(exc)[:120]}) — keeping the regex heuristic", file=sys.stderr)
         return "regex_fallback"
-    pad = sponsor_spans.SPONSOR_PAD
+    pad = SPONSOR_PAD
     for w in kept:
         segs = segments.get(w["id"]) or []
         lo, hi = w["start"], w["start"] + WINDOW_SPAN
@@ -492,12 +553,12 @@ def main() -> int:
                 "_specific": specific, "_recurring": rec,
             })
 
-    import corpus_io  # sibling; parses the timed-text XML into [start, text] cues
+    import store_io  # sibling; parses the timed-text XML into [start, text] cues
     for d in non_en_docs:
         vid = d.get("id") or d.get("_id")
         if not vid or vid in corpus:
             continue
-        cue_list = corpus_io.cues(d.get("transcript"))
+        cue_list = store_io.cues(d.get("transcript"))
         entry = corpus.setdefault(vid, {
             "id": vid, "title": d.get("title"), "publication_date": d.get("publication_date"),
             "views": None, "duration": d.get("duration"), "content_type": d.get("content_type"),

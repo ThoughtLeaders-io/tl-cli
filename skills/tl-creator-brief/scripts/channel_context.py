@@ -21,7 +21,20 @@ faceless channel with one personal Q&A upload still gets scanned.
 Usage:
     channel_context.py --channel <id>
     channel_context.py --channel <id> \\
-        --corpus tl-creator-profiles/.corpus/<id>/corpus.jsonl.gz
+        --corpus tl-creator-profiles/.corpus/<id>/corpus.jsonl.gz \\
+        [--per-video-out <dir>/per-video.jsonl] > <dir>/context-full.json
+    channel_context.py --from <dir>/context-full.json \\
+        --format-label solo --format-evidence "fp density 41/1k words" \\
+        [--host-names "Ali,Abdaal"] [--known-facts "ex-doctor;lives in London"] \\
+        --write-context <dir>/context.json
+
+The third form is the step between the stats and the extractor prompts: the
+model reads ``context-full.json``, calls the format label from it, and hands
+the label back here, which writes the compact ``context.json`` every
+``extractor_prompt.py`` render takes (``channel_name``, ``host_names``,
+``known_facts``, ``format_label``, ``format_evidence``). No network: it reads
+the full context from the file, so nothing is typed by hand and every run
+writes the same shape.
 
 Output (stdout): one JSON object.
 """
@@ -37,7 +50,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "_shared"))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import tl_data
-from corpus_io import open_corpus  # sibling script
+from store_io import open_corpus  # sibling module
 
 FIRST_PERSON = re.compile(r"\b(i|i'm|i've|i'd|i'll|my|me|myself)\b", re.I)
 
@@ -250,10 +263,51 @@ def corpus_stats(corpus_path: pathlib.Path) -> dict:
     }
 
 
+FORMAT_LABELS = ("solo", "interview", "multi_host", "faceless_scripted")
+
+
+def _split(raw: str | None, sep: str) -> list[str]:
+    return [x.strip() for x in (raw or "").split(sep) if x.strip()]
+
+
+def write_context(full: dict, *, format_label: str, format_evidence: str,
+                  host_names: list[str] | None = None,
+                  known_facts: list[str] | None = None) -> dict:
+    """The compact context block ``extractor_prompt.py`` renders into every
+    batch message, built from this script's own full output plus the format
+    call the model made from it."""
+    if format_label not in FORMAT_LABELS:
+        raise SystemExit(f"--format-label must be one of {', '.join(FORMAT_LABELS)}, "
+                         f"got {format_label!r}")
+    name = full.get("name") or full.get("channel_name") or ""
+    return {
+        "channel_name": name,
+        "host_names": host_names or ([name] if name else []),
+        "known_facts": known_facts or [],
+        "format_label": format_label,
+        "format_evidence": format_evidence,
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--channel", type=int, required=True,
+    ap.add_argument("--channel", type=int, default=None,
                     help="internal TL channel id, from `tl channels find`")
+    ap.add_argument("--from", dest="from_file", default=None,
+                    help="a saved context-full.json (this script's own stdout); "
+                         "with --write-context, no lookup is made")
+    ap.add_argument("--write-context", dest="write_context", default=None,
+                    help="write the compact extractor context block here "
+                         "(needs --format-label; --format-evidence recommended)")
+    ap.add_argument("--format-label", dest="format_label", default=None,
+                    choices=FORMAT_LABELS,
+                    help="the format the model called from the stats")
+    ap.add_argument("--format-evidence", dest="format_evidence", default="",
+                    help="one line of evidence for the label")
+    ap.add_argument("--host-names", dest="host_names", default=None,
+                    help="comma-separated; default: the channel name")
+    ap.add_argument("--known-facts", dest="known_facts", default=None,
+                    help="semicolon-separated facts already known about the host")
     ap.add_argument("--corpus", default=None,
                     help="corpus.jsonl.gz from fetch_cues.py (a plain "
                          ".jsonl corpus is read too); adds measured "
@@ -265,6 +319,27 @@ def main() -> None:
                          "orchestrating session)")
     a = ap.parse_args()
 
+    if a.write_context:
+        if not a.format_label:
+            ap.error("--write-context needs --format-label")
+        if a.from_file:
+            full = json.loads(pathlib.Path(a.from_file).read_text(encoding="utf-8"))
+        elif a.channel is not None:
+            full = {"name": channel_row(a.channel).get("channel_name")}
+        else:
+            ap.error("--write-context needs --from <context-full.json> or --channel")
+        ctx = write_context(full, format_label=a.format_label,
+                            format_evidence=a.format_evidence,
+                            host_names=_split(a.host_names, ","),
+                            known_facts=_split(a.known_facts, ";"))
+        path = pathlib.Path(a.write_context)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(ctx, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(json.dumps({"context": str(path), **ctx}, ensure_ascii=False))
+        return
+
+    if a.channel is None:
+        ap.error("--channel is required")
     row = channel_row(a.channel)
     doc = channel_doc(a.channel)
 

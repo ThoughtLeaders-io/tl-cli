@@ -42,12 +42,13 @@ downloaded that the model layer will not read.
 | `--out` | `tl-creator-profiles/.corpus` | corpus root; the channel id becomes a subdirectory, so concurrent channels never collide |
 | `--phrases` | `references/cue-phrases.txt` | the cue list |
 | `--max-windows` | 500 | the cap on what reaches the model layer in one round |
-| `--batch-size` | derived | windows per batch file, one per extractor agent; default `ceil(windows kept / agent cap)` where the cap is `$CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` (20 when unset), never below 5 — 500 windows make 20 × 25 on a 20-agent host and 39 × 13 on a 40-agent host |
+| `--batch-size` | derived | windows per batch file, one per extractor agent; default `ceil(windows kept / agent cap)` where the cap is `$CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` (20 when unset), never below 5 — 500 windows make 20 × 25 on the standard 20-agent host |
 | `--per-video-cap` | 8 | no single video may own the batch set |
 | `--fragment-size` / `--fragments-per-doc` | 900 / 10 | passage width and how many per video |
 | `--page-size` / `--concurrency` | 150 / 4 | paging and parallel year buckets |
 | `--reserve` | 0 | agent slots held by other lanes during the fan-out (`1` when the socials lane is on). Batches are sized against `agent cap - reserve`, so the last extractor is not rejected and relaunched a wave later: 500 windows make 19 × 27 rather than 20 × 25 on a 20-agent host |
 | `--exclude` | none | a `classified.jsonl` from an earlier round: passages already judged (same video, start within 30 s) are skipped |
+| `--round` / `--since` | 1 / none | an incremental round: `--round N` batches into `batches-rN/`, `--since <YYYY-MM-DD>` bounds the fetch to uploads after the ledger's `latest_video_date` (without it a round re-pulls every unjudged passage in the catalogue) |
 
 **`cue-phrases.txt`** is one phrase per line, `#` for comments. A leading
 `~` marks a **recurring bit** — a greeting, a sign-off, a channel catchphrase
@@ -60,7 +61,7 @@ spans the back catalogue rather than the last twelve months.
 
 **Ad reads.** Windows are built with a regex heuristic in `in_sponsor_read`,
 and once the cap is taken the kept windows' real sponsored spans are looked up
-by video id (`scripts/sponsor_spans.py`) and the flag is decided from them —
+by video id (`sponsor_segments` in `fetch_cues.py`) and the flag is decided from them —
 a window overlaps a read when `[start, start+30]` meets a sponsored span
 padded 75 s either side. The lookup is authoritative when it succeeds; the
 heuristic stays when it fails. The summary's `sponsor_source` says which one
@@ -71,11 +72,10 @@ decided, and it belongs in the run report whenever it reads `regex_fallback`.
 - `windows.jsonl.gz` — every passage found, ranked (a window carries
   `video_id` + `start`, not an assembled watch URL; whoever shows one builds
   `…watch?v=<video_id>&t=<start>s` at that point).
-- `batches/batch-NNN.json` — the capped set, 25 windows per file, one file per
-  extractor agent.
+- `batches/batch-NNN.json` — the capped set, one file per extractor agent,
+  sized to fill one wave of the host's agent cap (`--batch-size`).
 - `corpus.jsonl.gz` — the same store shape the verifiers read, holding the
-  fetched passages as cues, so `verify_quotes.py` and `quote_timestamp.py` run
-  unchanged. It is **passages, not transcripts**: `channel_context.py`'s
+  fetched passages as cues, so `verify_quotes.py` runs unchanged. It is **passages, not transcripts**: `channel_context.py`'s
   corpus stats over it are a format hint, not a coverage census.
 
 The summary (stdout) and one `FUNNEL stage=fetch_cues …` line (stderr) carry
@@ -99,7 +99,7 @@ agent (the file name is historical; the role is a **gem extractor**,
 pass decides whether the window is self-disclosure AND writes what it says:
 the third-person claim, the span of the window that proves it, the life
 domain, the speaker guess and the sensitivity tier. The rubric has ONE home:
-`references/gem-classifier.md`, which names the two `evidence-rules.md`
+`references/extractor-rubric.md`, which names the two `evidence-rules.md`
 sections it applies.
 
 The extractor never assembles its own input. `scripts/extractor_prompt.py`
@@ -170,29 +170,14 @@ verification scripts, no Bash, no other Reads, no second Write.
   tokens.
 
 **Concurrency.** The host runs at most `CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`
-agents at once (20 when unset; Claude Code 2.1.x reads the variable though
-it is not documented). Set it to 40 in the host's settings `env`, confirm
-the agents start together, and `fetch_cues.py` sizes the batches to fill
-one wave (Layer 1+2). Smaller batches also drop fewer windows: an 8-window batch
-was clean live where 25-window batches lost one or two.
+agents at once, 20 when unset, and 20 is the standard: leave the variable
+unset. Raising it to 40 was tested and slowed the run down (a second wave
+queued behind the cap instead of one wave finishing together).
+`fetch_cues.py` reads the cap and sizes the batches to fill one wave
+(Layer 1+2).
 
-**The scripted extractor is the fallback, not the default.**
-`scripts/classify_gems.py` sends the same rendered message to any
-OpenAI-compatible chat-completions endpoint, configured entirely by
-`CREATOR_BRIEF_LLM_API_KEY`, `CREATOR_BRIEF_LLM_BASE_URL` and
-`CREATOR_BRIEF_LLM_MODEL` (one request per batch, returns written where the
-agents write theirs, `assemble_extracts.py` validates both alike). Measured
-on the same 500 windows against the sonnet agents with one inexpensive
-hosted model (2026-09-02, opus-judged against the rubric): it ran in 91 s
-for a few cents, but 41 of 500 windows
-(8 %) failed the span contract (spans of 48–87 words, reversed spans), and
-on 60 disagreement windows the judge sided with sonnet 45 times and with
-the script 9, with 12 speaker misattributions on the script's side (clip
-voices logged as the host — the failure the rubric ranks worst) against 4.
-So the agents stay the default; use the script only when the host cannot
-spawn agents at all, and expect a below-threshold assemble that needs a
-subset re-judge. With any of the three variables unset it exits 20 and
-names the missing one.
+There is no scripted extractor: every batch is judged by an agent, and the
+only fallback is the `general-purpose` + `model: sonnet` spawn above.
 
 Print the stage's own funnel line from the returned receipts:
 `FUNNEL stage=extract batches=… agents=… windows=… gems=… elapsed_s=…`.
@@ -222,7 +207,7 @@ are only counted.
 It writes `classified.jsonl` (every judged window, and the `--exclude` input
 for a later round), `gems.jsonl` (the cluster step's input), `candidates.jsonl`
 and `respawn.json`. Windows that failed a check or were skipped are
-**unjudged**: they stay out of all three files and are listed in
+**unjudged**: they stay out of those files and are listed in
 `respawn.json`. **Coverage decides the exit code**, not perfection: with
 `unjudged / expected` within the `--min-coverage` threshold (default 0.95,
 so up to 25 of 500 windows) it exits **0** and the run continues — a few
@@ -245,7 +230,7 @@ assemble stops the chain by design. Spawn the merge agent in the same
 assistant message that reads that command's result — every notify-then-act
 gap between stages costs 20–60 s.
 
-## Layer 4: cluster, then one merge pass judges
+## Layer 4: cluster, then the sharded merge pass judges
 
 The mechanical bulk — verbatim checking — is code; the judgment slice is ONE
 small Claude pass over the clustered candidates.
@@ -275,10 +260,9 @@ member must match every other member. Near-duplicates that fail any of those
 stay separate — a missed merge costs a few tokens, a false merge would delete
 a distinct fact. Do not hand-merge what the script left apart.
 
-**One merge pass — ONE agent, returning decisions, never records.** The
-old pass wrote every ledger record itself and took 21–23 minutes on a
-220-fact channel, output-bound; now a script prepares its input, the agent
-returns a few kilobytes of judgment, and the same script expands them.
+**The merge pass returns decisions, never records.** A script prepares the
+input, each shard's agent returns a few kilobytes of judgment, and the same
+script expands them into the ledger.
 
 ```bash
 python3 <skill>/scripts/merge_pass.py prepare \
@@ -322,8 +306,9 @@ them are passed to `expand` as repeated `--decisions` flags. `selected` is
 **unioned** across the files rather than replaced, because each shard can only
 nominate from the domains it saw; `expand` still owns the final count.
 
-The agent reads `merge-input.jsonl` (plus the identity lane's findings when
-that lane ran) and **never the windows, never a transcript**. It decides
+Each shard's agent reads its `merge-input-N.jsonl` (`merge-input.jsonl` when
+there is one shard; plus the identity lane's findings when that lane ran) and
+**never the windows, never a transcript**. It decides
 what a script cannot, per `evidence-rules.md`:
 
 - attribution reasoning the features cannot encode (recurrence never
@@ -408,8 +393,26 @@ are `f001…` in cluster order on a fresh build. It writes `facts.jsonl`
 `FUNNEL stage=merge clusters=… judged=… auto_dropped=… facts=… folded=…
 dropped=… selected=… elapsed_s=…`.
 
-**On an incremental round** it starts from the existing ledger rather than
-a blank page. `prepare --existing --state` maps every re-clustered cluster
+### Incremental round
+
+Decision `refresh` from `ledger_meta.py check` (round `N` = its `next_round`):
+
+```bash
+python3 <skill>/scripts/fetch_cues.py --channel <id> --host-terms "…" --round N \
+  --since <latest_video_date> --exclude <corpus>/classified.jsonl
+# fan out extractors over <corpus>/batches-rN only, then
+python3 <skill>/scripts/assemble_extracts.py --batches <corpus>/batches-rN \
+  --returns <corpus>/returns-rN --out <corpus> --append && \
+python3 <skill>/scripts/cluster_gems.py --in <corpus>/gems.jsonl && \
+python3 <skill>/scripts/merge_pass.py prepare --clustered <corpus>/gems-clustered.jsonl \
+  --format <label> --existing tl-creator-profiles/<id>-facts.jsonl \
+  --state <corpus>/merge-state.json --out <corpus>
+# merge agents as usual, then expand with the same --existing --state, verify, and
+python3 <skill>/scripts/ledger_meta.py write --channel <id> --from <corpus>/facts.jsonl.verified.jsonl --rounds N
+```
+
+Cost scales with the new uploads, not the corpus. `expand` starts from the
+existing ledger rather than a blank page. `prepare --existing --state` maps every re-clustered cluster
 by its **member keys** (`<video_id>:<window start>` — never the fact's
 `start`, which the verifier rewrites): members all known to one existing
 fact → additive, judgment carried, recurrence recomputed, not sent to the
@@ -461,14 +464,22 @@ new uploads, not new terms — adds `--since <latest_video_date>` so the fetch
 is bounded to what the ledger has not seen; measured live, an unbounded
 `--exclude` round on a 283-video channel re-pulled 1,765 unjudged passages
 and would have cost another full fan-out.) Confirmed entities
-also feed Mode B's connection probes and improve attribution (a fact tied to a
+also feed CONNECT's connection probes and improve attribution (a fact tied to a
 known family name anchors the host).
 
 ## The channel context brief
 
 ```bash
-python3 <skill>/scripts/channel_context.py --channel <id> --corpus <corpus.jsonl.gz> --per-video-out <dir>/per_video.json
+python3 <skill>/scripts/channel_context.py --channel <id> --corpus <corpus>/corpus.jsonl.gz \
+  --per-video-out <corpus>/per-video.jsonl > <corpus>/context-full.json
+# the model calls the label from context-full.json, then:
+python3 <skill>/scripts/channel_context.py --from <corpus>/context-full.json \
+  --format-label <label> --format-evidence "…" [--host-names "…"] [--known-facts "…"] \
+  --write-context <corpus>/context.json
 ```
+
+The second command writes the compact `context.json` every extractor prompt
+takes; nothing about it is typed by hand.
 
 After the fetch, format is measured rather than guessed: first-person
 density, interview markers, question density, title hints. The corpus it reads
@@ -507,7 +518,7 @@ windows with no re-spawn round. The whole fresh PROFILE run was 706 s
 1 s, merge agent 280 s, expand→verify→write 16 s), 206 facts, every quote
 exact — against 1,201 s before the change. Claude's share of a profile build is the fan-out
 plus a handful of turns: the identity lane, the format call, one merge pass —
-**one extractor per batch, one merge agent, one optional socials lane**, not
+**one extractor per batch, one merge agent per shard, one optional socials lane**, not
 one per window and not one per fact.
 
 Every stage prints its own `elapsed_s` on its `FUNNEL` line, so "it was slow"

@@ -16,7 +16,7 @@ from pathlib import Path
 _SCRIPTS = (Path(__file__).resolve().parents[1]
             / "skills" / "tl-creator-brief" / "scripts")
 sys.path.insert(0, str(_SCRIPTS))
-import ledger_io  # noqa: E402
+import store_io  # noqa: E402
 import merge_pass  # noqa: E402
 
 _MERGE = _SCRIPTS / "merge_pass.py"
@@ -120,7 +120,7 @@ def _expand(clustered, decisions, out, *, fmt="solo", channel="1",
 
 
 def _facts(path):
-    _, facts = ledger_io.read_ledger(path)
+    _, facts = store_io.read_ledger(path)
     return {f["fact_id"]: f for f in facts}
 
 
@@ -371,7 +371,7 @@ def test_the_facts_file_has_no_meta_header(tmp_path):
     clustered = _write_clusters(tmp_path, [_cluster("one")])
     out = tmp_path / "facts.jsonl"
     _keep_all(clustered, out)
-    meta, facts = ledger_io.read_ledger(out)
+    meta, facts = store_io.read_ledger(out)
     assert meta is None and len(facts) == 1
 
 
@@ -487,7 +487,7 @@ def _existing(tmp_path, facts, meta=True):
     path = tmp_path / "31792-facts.jsonl"
     header = ({"schema": "tl-creator-meta/v2", "channel_id": 31792}
               if meta else None)
-    ledger_io.write_ledger(path, header, facts)
+    store_io.write_ledger(path, header, facts)
     return path
 
 

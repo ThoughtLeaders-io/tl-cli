@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """Render the ONE self-contained message an extractor gets for one batch.
 
-The extractor (the ``gem-classifier`` agent, or the scripted endpoint in
-``classify_gems.py``) must never read files: everything it needs is inline —
-the rubric (``references/gem-classifier.md``), the two ``evidence-rules.md``
-sections the rubric names, the channel context block, and the batch's windows
-as JSON. One message in, one JSON object out: an agent reads the rendered
-message file (one Read), writes its JSON (one Write) and replies with a
-receipt — three short turns instead of five that re-read a growing context —
-and the scripted endpoint sends the same message as one request.
+The extractor (the ``gem-classifier`` agent) must never read files:
+everything it needs is inline — the rubric (``references/extractor-rubric.md``),
+the two ``evidence-rules.md`` sections the rubric names, the channel context
+block, and the batch's windows as JSON. One message in, one JSON object out:
+the agent reads the rendered message file (one Read), writes its JSON (one
+Write) and replies with a receipt.
 
 Usage:
     extractor_prompt.py --batch <batches>/batch-NNN.json --context <context.json>
@@ -16,15 +14,15 @@ Usage:
                         --out <corpus>/prompts/batch-NNN.md [--indexes 3,7,12]
 
 ``--write-to`` names the file the agent writes its JSON to (the receipt
-transport: one Write, one-line return). Omit it for the scripted endpoint,
-which takes the JSON straight from the response. ``--indexes`` renders only
+transport: one Write, one-line return); without it the message asks for the
+JSON as the whole reply. ``--indexes`` renders only
 those windows for a subset re-judge; each keeps its original ``i`` from the
 batch file. ``--out`` writes the rendered message to a file (the one file the
 agent is told to read) instead of stdout.
 
-The context block is the same JSON ``classify_gems.py`` takes:
-``{"channel_name", "host_names", "known_facts", "format_label",
-"format_evidence"}``. The rubric and the evidence sections are read at render
+The context block is ``context.json`` from ``channel_context.py
+--write-context``: ``{"channel_name", "host_names", "known_facts",
+"format_label", "format_evidence"}``. The rubric and the evidence sections are read at render
 time so they keep exactly one home each.
 """
 from __future__ import annotations
@@ -36,7 +34,7 @@ import re
 import sys
 
 REFS = pathlib.Path(__file__).resolve().parents[1] / "references"
-RUBRIC_FILE = REFS / "gem-classifier.md"
+RUBRIC_FILE = REFS / "extractor-rubric.md"
 EVIDENCE_FILE = REFS / "evidence-rules.md"
 # The evidence-rules sections the rubric tells the extractor to apply.
 EVIDENCE_SECTIONS = ("What counts as self-disclosure", "Attribution")
@@ -125,7 +123,7 @@ def render(windows: list[dict], context: dict, rubric: str, evidence: str,
         tail = RETURN_INSTRUCTIONS
     return (
         HEADER
-        + "\n=== RUBRIC (references/gem-classifier.md) ===\n" + rubric.strip() + "\n"
+        + "\n=== RUBRIC (references/extractor-rubric.md) ===\n" + rubric.strip() + "\n"
         + "\n=== EVIDENCE RULES (references/evidence-rules.md, the sections the rubric names) ===\n"
         + evidence.strip() + "\n"
         + "\n=== CONTEXT ===\n" + json.dumps(ctx, ensure_ascii=False, indent=1) + "\n"

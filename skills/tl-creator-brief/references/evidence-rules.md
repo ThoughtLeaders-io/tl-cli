@@ -21,7 +21,7 @@ hold:
    exactly the kind of find this skill exists for.
 
 Cast wide. Material with no bearing on any brand belongs in the profile; the
-unrelated detail is where the good connections come from, and Mode B narrows
+unrelated detail is where the good connections come from, and CONNECT narrows
 later with its own inputs.
 
 ## Attribution
@@ -87,11 +87,11 @@ output:
   permitted edit, with the raw caption text noted.
 - **A non-English quote publishes verbatim in its source language**, with an
   English gloss alongside labelled as a translation. The gloss is never the
-  quote: verification (`quote_timestamp.py`) always runs against the
+  quote: verification (`verify_quotes.py`) always runs against the
   original words.
 - Every quote carries its `&t=` link. The fetch attaches offsets at birth; a
-  quote from anywhere else goes through `scripts/quote_timestamp.py`.
-- **A partial match is never a verification.** `quote_timestamp.py` reports
+  quote from anywhere else goes through `scripts/verify_quotes.py`.
+- **A partial match is never a verification.** `verify_quotes.py` reports
   `match: "exact" | "partial" | "none"`; only `exact` publishes. On
   `partial`, fix the quote to what the captions actually hold or drop it —
   never publish the original words against a partial match, because a shared
@@ -116,7 +116,7 @@ Every fact carries a `sensitivity` tier. The binary "sensitive" flag it
 replaces threw away the difference between "wears contacts" and "was
 diagnosed with X", and that difference is the whole judgment:
 
-| tier | what it holds | in Mode B connection angles |
+| tier | what it holds | in CONNECT connection angles |
 |---|---|---|
 | `none` | ordinary disclosure, including beliefs, being a parent, city/country | yes |
 | `lifestyle` | glasses/contacts, diet, fitness, weight change discussed openly, sleep, skincare, casual allergies, supplements | yes |
@@ -159,6 +159,6 @@ thrice is one occurrence.
 - An empty result is a real answer. "No evidence found" — with the coverage
   numbers that bound the claim — is correct and forwardable. A profile
   assembled from unattributable guesses is worse than nothing.
-- If the profile holds nothing that honestly connects to a brand, Mode B says
+- If the profile holds nothing that honestly connects to a brand, CONNECT says
   exactly that, shows what was searched, and stops. A no-fit verdict is a
   valid output.

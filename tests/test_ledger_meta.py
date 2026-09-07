@@ -12,7 +12,7 @@ from pathlib import Path
 _SCRIPTS = (Path(__file__).resolve().parents[1]
             / "skills" / "tl-creator-brief" / "scripts")
 sys.path.insert(0, str(_SCRIPTS))
-import ledger_io  # noqa: E402
+import store_io  # noqa: E402
 import ledger_meta  # noqa: E402
 
 
@@ -57,7 +57,7 @@ def _build_dir(tmp_path: Path, channel: int = 42, facts=None) -> tuple[Path, Pat
 
 
 def _header(profiles: Path, channel: int = 42) -> dict:
-    return ledger_io.read_ledger(profiles / f"{channel}-facts.jsonl")[0]
+    return store_io.read_ledger(profiles / f"{channel}-facts.jsonl")[0]
 
 
 # --------------------------------------------------------------------------- #
@@ -72,7 +72,7 @@ def test_write_puts_the_meta_record_on_the_ledgers_first_line(tmp_path, capsys):
     assert not (profiles / "42-meta.json").exists()      # no sidecar any more
     first = json.loads(ledger.read_text().splitlines()[0])
     assert first["schema"] == "tl-creator-meta/v2"
-    meta, facts = ledger_io.read_ledger(ledger)
+    meta, facts = store_io.read_ledger(ledger)
     assert meta == first and facts == _LEDGER_FACTS      # facts untouched
     assert meta["channel_id"] == 42 and meta["channel_name"] == "Patterrz"
     assert meta["corpus_window"] == ["2019-04-02", "2026-08-20"]
@@ -94,7 +94,7 @@ def test_rewriting_the_header_in_place_recounts_and_never_doubles_it(tmp_path):
     ledger_meta.main(["write", "--channel", "42", "--profiles-dir", str(profiles)])
     lines = (profiles / "42-facts.jsonl").read_text().splitlines()
     assert len(lines) == 4                              # one header, three facts
-    assert _header(profiles)["coverage"]["facts"] == 3  # counted through ledger_io
+    assert _header(profiles)["coverage"]["facts"] == 3  # counted through store_io
 
 
 def test_write_falls_back_to_the_corpus_when_no_fetch_summary(tmp_path):
@@ -181,7 +181,7 @@ def test_write_from_verified_facts_strips_verify_and_keeps_everything_else(tmp_p
     rc = ledger_meta.main(["write", "--channel", "42", "--profiles-dir", str(profiles),
                            "--from", str(src), "--channel-name", "Patterrz"])
     assert rc == 0
-    meta, facts = ledger_io.read_ledger(profiles / "42-facts.jsonl")
+    meta, facts = store_io.read_ledger(profiles / "42-facts.jsonl")
     assert meta["schema"] == "tl-creator-meta/v2" and meta["coverage"]["facts"] == 2
     assert [f.get("verify") for f in facts] == [None, None]
     assert facts[0]["members"] == [{"video_id": "a", "start": 12}]
@@ -210,7 +210,7 @@ def test_write_from_carries_the_previous_header_over(tmp_path):
     src = _jsonl(tmp_path / "facts.verified.jsonl", _VERIFIED)
     ledger_meta.main(["write", "--channel", "42", "--profiles-dir", str(profiles),
                       "--from", str(src), "--rounds", "2"])
-    meta, facts = ledger_io.read_ledger(profiles / "42-facts.jsonl")
+    meta, facts = store_io.read_ledger(profiles / "42-facts.jsonl")
     assert meta["channel_name"] == "Patterrz" and meta["format"] == "solo"
     assert meta["lanes"] == "transcripts+socials" and meta["rounds"] == 2
     assert len(facts) == 2 and meta["coverage"]["facts"] == 2
@@ -227,7 +227,7 @@ def _ledger(tmp_path: Path, generated_at: str, latest: str = "2026-08-20",
             "channel_name": "Sydney Watson", "generated_at": generated_at,
             "corpus_window": ["2016-03-01", "2026-08-20"], "coverage": {"facts": 91},
             "latest_video_date": latest, "rounds": 1}
-    ledger_io.write_ledger(profiles / "42-facts.jsonl", meta if header else None,
+    store_io.write_ledger(profiles / "42-facts.jsonl", meta if header else None,
                            [{"fact_id": "f1", "claim": "x"}] * 91)
     return profiles
 
@@ -348,9 +348,9 @@ def test_a_transcripts_only_ledger_refreshes_when_socials_are_asked_for(
     # the reverse reuses: a ledger that also read socials covers a
     # transcripts-only request
     path = profiles / "42-facts.jsonl"
-    meta, facts = ledger_io.read_ledger(path)
+    meta, facts = store_io.read_ledger(path)
     meta["lanes"] = "transcripts+socials"
-    ledger_io.write_ledger(path, meta, facts)
+    store_io.write_ledger(path, meta, facts)
     _, out = _check(monkeypatch, capsys, profiles, "--lanes", "transcripts",
                     total=0, today=dt.date(2026, 9, 2))
     assert out["decision"] == "reuse"

@@ -13,7 +13,7 @@ skill's own directory):
   is one fact. This is **the stable interface** other skills, personas and
   CONNECT runs consume, and the thing a second brand reuses. Full
   thoroughness lives here. Every reader and writer goes through
-  `scripts/ledger_io.py` (`read_ledger` → `(meta, facts)`, `write_ledger`);
+  `scripts/store_io.py` (`read_ledger` → `(meta, facts)`, `write_ledger`);
   nothing in the repo iterates a ledger's lines raw, so the header is never
   mistaken for a fact.
 - **`<channel_id>-<brand_id>-connections.html`** — the one human page, per
@@ -84,7 +84,7 @@ by `scripts/ledger_meta.py write --from`:
   exactly for the withheld tiers (`clinical`, `children`, `location`) — kept
   so readers written against the old flag keep working. The tier is the fact;
   never set the boolean independently of it. Every fact carries the tier;
-  the ledger view renders it as a badge and tallies it.
+  the connections page renders it as a badge and tallies it.
 - `superseded_by`: the `fact_id` of the newer fact when latest-wins applies;
   superseded facts stay in the ledger as history.
 - `selected`: true on at most 20 facts. The merge pass proposes the picks
@@ -189,11 +189,11 @@ announcement line, which the run report repeats verbatim —
 
 - **`reuse`** — at most 5 uploads since and the ledger is at most 60 days
   old (`--max-new-videos`, `--max-age-days`): use the ledger as is. CONNECT
-  goes straight to the brand read; PROFILE re-renders the ledger view.
+  goes straight to the brand read; PROFILE reports the ledger as it is.
 - **`refresh`** — more uploads than that, or an older ledger, or the count
   failed, or the run asks for the socials lane and the ledger was built from
   transcripts only (a ledger that read socials covers a transcripts-only
-  request; the reverse does not): run ONE incremental round (SKILL.md, "Incremental refresh") —
+  request; the reverse does not): run ONE incremental round (`transcript-mining.md`, "Incremental round") —
   fetch with `--round N --since <latest_video_date> --exclude
   classified.jsonl`, extract only the new
   batches, assemble with `--append`, re-cluster, `merge_pass.py prepare
@@ -208,7 +208,7 @@ announcement line, which the run report repeats verbatim —
 is new. Never reuse silently — the announcement line is the user's notice
 that the ledger predates today's uploads — and never refuse to rebuild.
 
-## Mode B: the connection map source
+## CONNECT: the connection map source
 
 The connection pass writes a ranked connection map as a working markdown
 file, `tl-creator-profiles/.corpus/<channel_id>/connections-<brand_id>.md`
@@ -320,7 +320,7 @@ in for a legacy headerless ledger). Top to bottom:
    renders its verdict as prose, no cards.
 6. **Where this could go wrong** — its own block after the cards, never
    numbered among them, so an honest mismatch is never mistaken for an angle.
-7. **About this ledger** — the honesty strip the old ledger view carried:
+7. **About this ledger** — the honesty strip:
    fact count with confidence tallies; sensitivity tiers with the count
    withheld from angles (`clinical` counts as withheld only below three
    videos, per `evidence-rules.md`); the coverage line —

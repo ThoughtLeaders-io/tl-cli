@@ -21,19 +21,30 @@ read only when the ledger carries no header.
 The page, in order:
 
 - the header — creator × brand, with the brand-read and ledger-build dates;
-- **Who they are** — rendered from the ledger at render time, never written
-  by a model: the top recurring facts by life domain;
-- **About <brand>** — the markdown body's ``## About …`` section, rendered as
-  prose above the cards (it is context, not a connection, so it is never
-  numbered as one);
-- **Connections** — one numbered card per remaining ``## `` section, in the
-  markdown's order, which IS the ranking. Provenance labels in the markdown
-  (``[web]``, ``[social: …]``) are kept: a connection map names its lanes. A
-  no-fit verdict has no sections and stays prose;
+- **Who they are** — the markdown's ``## About <creator>`` prose, then the
+  ledger's ``selected`` facts as a short readable run, picked here at render
+  time (tier ``children`` / ``location`` never enter; ``clinical`` carries
+  its badge);
+- **Thesis** — the markdown's ``## Thesis``, the page's lead block, above
+  the brand;
+- **About <brand>** — the markdown's ``## About <brand>``, rendered as prose
+  (context, not a connection, so never numbered as one);
+- **Connections** — one numbered card per connection ``## `` section, in the
+  markdown's order, which IS the ranking: the quote with its ``&t=`` link,
+  what the brand offers and from which lane, the use case, the optional
+  labelled sample read, the Do / Do not pair. Provenance labels (``[web]``,
+  ``[social: …]``) are kept. A no-fit verdict has no sections and stays
+  prose;
+- **Where this could go wrong** — its own block after the cards, never
+  numbered among them;
 - **About this ledger** — the honesty footer ``references/evidence-rules.md``
-  requires: the confidence and sensitivity tallies with the count withheld
-  from angles, the coverage ratio and "absence is not evidence", the build
-  facts, and the linked platforms / sibling channels the run did not mine.
+  requires: confidence and sensitivity tallies with the count withheld from
+  angles, the coverage ratio and "absence is not evidence", the build facts,
+  and the linked platforms / sibling channels the run did not mine.
+
+``--check`` validates the markdown against this contract (frontmatter, the
+required sections, a timestamped link inside every connection's blockquote,
+no price language), prints the problems and exits 3 without writing.
 
 Facts at tier ``children`` or ``location`` never enter the who-they-are
 section (they are withheld from brand-facing angles by default); ``clinical``
@@ -53,7 +64,7 @@ import sys
 from collections import Counter, defaultdict
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from ledger_io import read_ledger  # sibling script  # noqa: E402
+from store_io import read_ledger  # sibling module  # noqa: E402
 
 BADGES = {
     "direct": "direct",

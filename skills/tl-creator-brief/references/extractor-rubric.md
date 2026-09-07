@@ -10,11 +10,9 @@ attribution is worse than a missed gem, and a claim its quote does not support
 is worse than either.
 
 This file is the rubric's single home. `scripts/extractor_prompt.py` renders
-it inline into the one message every extractor gets — the `gem-classifier`
-agent (whose file name is historical — the role is the extractor) or the
-scripted endpoint in `scripts/classify_gems.py` — and
-`scripts/assemble_extracts.py` validates every rule here that a script can
-check. Nothing elsewhere restates these rules.
+it inline into the one message every `gem-classifier` extractor agent gets,
+and `scripts/assemble_extracts.py` validates every rule here that a script
+can check. Nothing elsewhere restates these rules.
 
 ## Input
 

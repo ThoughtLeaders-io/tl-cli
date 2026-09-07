@@ -20,7 +20,7 @@ part of the tl-creator-brief skill. Classification and extraction are the
 same pass: you decide what each window is AND write out what it says.
 
 The caller's message names ONE file: a rendered message that is
-self-contained — the rubric (the skill's `references/gem-classifier.md`),
+self-contained — the rubric (the skill's `references/extractor-rubric.md`),
 the evidence-rules sections it applies, the channel context, the windows
 as JSON, and where to write your output. Read that file and follow it
 exactly. It is the single home of the rules so every batch is judged the

@@ -3,7 +3,7 @@
 
 The mechanical half of what the confirmation wave used to do: each
 transcript-provenance candidate fact's quote is located in its video's stored
-captions with the same matcher ``quote_timestamp.py`` uses. Only an **exact**
+captions by ``locate`` below, the one quote matcher. Only an **exact**
 contiguous match auto-accepts; ``partial`` and ``none`` are flagged, never
 accepted — a shared opening with a different tail is how a fabricated quote
 gets a real timestamp. The judgment half (sensitivity, ambiguous voices,
@@ -13,7 +13,7 @@ Usage:
     verify_quotes.py --in candidates.jsonl \\
         --corpus tl-creator-profiles/.corpus/<id>/corpus.jsonl.gz
 
-Input is read through ``ledger_io``: one candidate per line, and a ledger's
+Input is read through ``store_io``: one candidate per line, and a ledger's
 meta header (first line, ``schema: tl-creator-meta/*``) is not a candidate —
 it is carried over to the output file unchanged. Candidates with
 ``provenance: "transcript"`` (or no provenance but a ``video`` field) need
@@ -40,14 +40,71 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
+import re
 import sys
 import time
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "_shared"))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from corpus_io import open_corpus  # sibling script
-from ledger_io import read_ledger, write_ledger  # sibling script
-from quote_timestamp import locate  # sibling script
+from store_io import open_corpus, read_ledger, write_ledger  # sibling module
+
+
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", "", s.lower())).strip()
+
+
+def locate(cues: list[tuple[float, str]], quote: str,
+           hint_start: float | None = None) -> dict:
+    """Find the quote in the normalized cue stream; say how much matched.
+
+    A quote can occur more than once in a video (a catchphrase, a repeated
+    line on a multi-voice upload). With ``hint_start`` — the candidate's
+    claimed timestamp — the exact match nearest that time wins, so
+    verification never silently relocates a fact to an earlier occurrence
+    spoken by someone else. Without a hint, the first occurrence wins.
+    """
+    parts, owner = [], []
+    for i, (_, text) in enumerate(cues):
+        n = _norm(text)
+        if not n:
+            continue
+        if parts:
+            parts.append(" ")
+            owner.append(i)
+        parts.append(n)
+        owner.extend([i] * len(n))
+    hay = "".join(parts)
+    needle = _norm(quote)
+    if not needle:
+        return {"match": "none"}
+
+    starts = []
+    pos = hay.find(needle)
+    while pos >= 0:
+        cue = cues[owner[pos]]
+        starts.append((int(cue[0]), cue[1]))
+        pos = hay.find(needle, pos + 1)
+    if starts:
+        if hint_start is not None:
+            starts.sort(key=lambda s: abs(s[0] - hint_start))
+        start, cue_text = starts[0]
+        return {"match": "exact", "start": start, "cue": cue_text,
+                "occurrences": len(starts)}
+
+    # Longest word-prefix of the quote that IS present, reported as partial —
+    # never as a verification of the whole quote.
+    words = needle.split()
+    best = None
+    for n in range(len(words) - 1, 3, -1):
+        prefix = " ".join(words[:n])
+        pos = hay.find(prefix)
+        if pos >= 0:
+            cue = cues[owner[pos]]
+            best = {"match": "partial", "start": int(cue[0]), "cue": cue[1],
+                    "matched_prefix": prefix,
+                    "unmatched_tail": " ".join(words[n:])}
+            break
+    return best or {"match": "none"}
 
 
 def funnel(**fields) -> None:

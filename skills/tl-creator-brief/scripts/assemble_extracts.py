@@ -2,8 +2,7 @@
 """Assemble extractor output files into the classified record, the gem list
 and the candidate facts, validating the contract mechanically.
 
-Each extractor (an agent, or the scripted endpoint in ``classify_gems.py``)
-produces ``<returns>/batch-NNN.extract.json``:
+Each extractor agent produces ``<returns>/batch-NNN.extract.json``:
     {"batch": "NNN", "windows": N,
      "gems":     [{"i", "start", "anchor", "life_domain", "speaker_guess",
                    "sensitivity", "entity_corrections", "notable", "claim",

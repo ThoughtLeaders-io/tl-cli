@@ -337,7 +337,7 @@ def _run(tmp_path, monkeypatch, docs, *, argv=(), phrases=None, spans=None,
             "total": total,
             "aggregations": {"lang": {"buckets": [
                 {"key": k, "doc_count": v} for k, v in lang_counts.items()]}}})
-    monkeypatch.setattr(fetch_cues.sponsor_spans, "sponsor_segments",
+    monkeypatch.setattr(fetch_cues, "sponsor_segments",
                         spans or (lambda refs: {}))
     phrase_file = tmp_path / "phrases.txt"
     phrase_file.write_text(phrases if phrases is not None
@@ -504,7 +504,7 @@ def test_run_writes_batches_windows_and_a_reusable_corpus(tmp_path, monkeypatch)
     with gzip.open(summary["corpus"], "rt", encoding="utf-8") as f:
         rows = [json.loads(line) for line in f]
     assert len(rows) == 3
-    # corpus rows are the store shape verify_quotes.py / quote_timestamp.py read
+    # corpus rows are the store shape verify_quotes.py reads
     assert {"id", "title", "publication_date", "cues", "transcript_language"} <= set(rows[0])
     assert rows[0]["transcript_language"] == "en"
     assert [c[0] for c in rows[0]["cues"]] == [100.0, 400.0]   # cues are timed
