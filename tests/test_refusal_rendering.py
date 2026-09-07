@@ -53,7 +53,7 @@ class TestAccessDenied403:
         out = _render(
             ApiError(403, detail, raw={"detail": detail, "code": "plan_required"}),
             capsys,
-            code=1,
+            code=5,
         )
         assert "Access denied: Snapshots require a paid plan" in out
         # The detail already names the plan; a bolted-on suggestion would be
@@ -61,7 +61,7 @@ class TestAccessDenied403:
         assert "Your plan may not include" not in out
 
     def test_superuser_gate_gets_no_plan_upsell(self, capsys):
-        out = _render(ApiError(403, "Superuser only", raw={"detail": "Superuser only"}), capsys, code=1)
+        out = _render(ApiError(403, "Superuser only", raw={"detail": "Superuser only"}), capsys, code=5)
         assert "Access denied: Superuser only" in out
         assert "plan" not in out.lower()
 
@@ -71,7 +71,7 @@ class TestHintsOnBillingStatuses:
     # handler only rendered hints on the generic branch.
     def test_hint_renders_on_403(self, capsys):
         error = ApiError(403, "Query rejected: premium column(s)", raw={"hint": "Name the columns you want."})
-        out = _render(error, capsys, code=1)
+        out = _render(error, capsys, code=5)
         assert "Hint: Name the columns you want." in out
 
     def test_hint_renders_on_429(self, capsys):

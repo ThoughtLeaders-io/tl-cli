@@ -31,7 +31,10 @@ from datetime import date
 
 import _io_utf8  # noqa: F401  (side effect: forces UTF-8 stdout/stderr on Windows)
 
-import tl_cli
+import pathlib as _pathlib
+import sys as _sys
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parents[2] / "_shared"))
+import tl_data
 
 PENALTIES = {
     "B_sponsored_video_concealed": (30, "critical"),
@@ -58,7 +61,7 @@ def _d(s):
 
 
 def _sponsored_article_ids(channel_id: int) -> dict[str, dict]:
-    rows = tl_cli.db_pg(
+    rows = tl_data.db_pg(
         "SELECT a.id, a.publish_status, a.publish_date, a.price, a.article_id "
         "FROM thoughtleaders_adlink a "
         "JOIN thoughtleaders_adspot s ON a.ad_spot_id = s.id "
@@ -96,10 +99,8 @@ def _all_articles(channel_id: int) -> list[dict]:
         },
         "sort": [{"publication_date": {"order": "desc"}}],
     }
-    res = tl_cli.db_es(body)
     out = []
-    for h in res.get("hits", {}).get("hits", []):
-        s = h.get("_source", h)
+    for s in tl_data.db_es(body):
         vid = str(s.get("id", ""))
         out.append(
             {

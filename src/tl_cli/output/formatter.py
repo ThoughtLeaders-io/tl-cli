@@ -215,7 +215,7 @@ def _detect_numeric_columns(results: list[dict], columns: list[str]) -> set[str]
                 numeric.discard(col)
     # Don't treat ID-like columns as numeric
     for col in list(numeric):
-        if col.endswith("_id") or col == "id" or "publication" in col:
+        if col.endswith("_id") or col == "id":
             numeric.discard(col)
     # Columns where every sampled value was None/empty aren't meaningfully numeric
     for col in list(numeric):

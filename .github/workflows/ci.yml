@@ -36,3 +36,31 @@ jobs:
         # tests/ mock the HTTP client (CliRunner + fake get_client), so there
         # is no network, no API key, and no credit spend.
         run: uv run --python ${{ matrix.python-version }} --with pytest pytest tests/ -v
+
+  windows-launcher:
+    name: Windows launcher (tl setup windows)
+    # `tl setup windows` writes a tl.cmd that runs the CLI through the signed
+    # python.exe, so the unsigned pipx stub can't be blocked by Smart App
+    # Control. This job proves the wrapper is written and actually launches the
+    # CLI. NOTE: GitHub runners don't have SAC in enforcement, so this verifies
+    # the mechanism, not the block itself — real SAC validation needs a SAC/WDAC
+    # machine. Hermetic: a uv project install is a dev install, so the CLI's
+    # auto-updater no-ops (no network).
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Sync locked dependencies
+        run: uv sync --frozen
+      - name: Install the launcher wrapper
+        run: uv run tl setup windows
+      - name: Wrapper exists and launches the CLI through python
+        shell: pwsh
+        run: |
+          $cmd = "$env:LOCALAPPDATA\Programs\tl-cli\tl.cmd"
+          if (-not (Test-Path $cmd)) { throw "wrapper not written at $cmd" }
+          Get-Content $cmd
+          & $cmd --version
+          if ($LASTEXITCODE -ne 0) { throw "wrapper failed to launch the CLI (exit $LASTEXITCODE)" }

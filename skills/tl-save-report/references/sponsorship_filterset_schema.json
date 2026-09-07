@@ -58,18 +58,6 @@
       "_tl_django_m2m": "FilterSet.exclude_brands via FilterSetExcludeBrand"
     },
 
-    "networks": {
-      "type": ["array", "null"],
-      "items": { "type": "integer", "minimum": 1 },
-      "uniqueItems": true,
-      "_tl_django_m2m": "FilterSet.networks → thoughtleaders.Publication"
-    },
-    "exclude_networks": {
-      "type": ["array", "null"],
-      "items": { "type": "integer", "minimum": 1 },
-      "uniqueItems": true
-    },
-
     "start_date": {
       "type": ["string", "null"],
       "format": "date",

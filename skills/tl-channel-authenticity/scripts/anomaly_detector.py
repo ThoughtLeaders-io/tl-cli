@@ -14,7 +14,10 @@ import statistics
 import _io_utf8  # noqa: F401  (side effect: forces UTF-8 stdout/stderr on Windows)
 import view_curves
 
-import tl_cli
+import pathlib as _pathlib
+import sys as _sys
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parents[2] / "_shared"))
+import tl_data
 
 PENALTIES = {
     "B_burst_without_engagement": (25, "critical"),
@@ -129,7 +132,7 @@ def _analyze_video(channel_id: int, video: dict) -> dict:
 
 
 def _subs_vs_views(channel_id: int) -> dict | None:
-    rows = tl_cli.db_fb(
+    rows = tl_data.db_fb(
         "SELECT scrape_date, total_views, subscribers FROM channel_metrics "
         f"WHERE id = {int(channel_id)} ORDER BY scrape_date"
     )

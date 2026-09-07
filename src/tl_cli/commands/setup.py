@@ -160,12 +160,67 @@ def _run_claude(args: list[str], claude_bin: str) -> tuple[bool, str]:
         return False, str(e)
 
 
+def _installed_plugin_version() -> str | None:
+    """Version of the plugin Claude Code actually has on disk, or None.
+
+    Reads Claude Code's own install record rather than trusting the stamp
+    written at setup time: `plugin install` is a no-op once the plugin is
+    present, so a stamp saying "whatever the CLI version was when setup last
+    ran" can name a version that was never installed. Returns None when the
+    record is missing or unreadable — callers treat that as "unknown", never
+    as "outdated", so a change to Claude Code's bookkeeping cannot turn into
+    a false warning for every user at once.
+    """
+    try:
+        record = json.loads((CLAUDE_PLUGINS_DIR / "installed_plugins.json").read_text(encoding="utf-8"))
+        entries = record["plugins"][PLUGIN_KEY]
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if not isinstance(entries, list):
+        return None
+    # One entry per install scope; setup installs at user scope, so prefer it.
+    scoped = sorted((e for e in entries if isinstance(e, dict)), key=lambda e: e.get("scope") != "user")
+    for entry in scoped:
+        version = entry.get("version")
+        if isinstance(version, str) and version and version != "unknown":
+            return version
+    return None
+
+
 def _get_installed_plugin_version() -> str | None:
-    """Try to read the installed plugin version from the cache."""
+    """Installed plugin version: Claude Code's record, else the setup stamp.
+
+    The stamp is the fallback for installs that never reached the plugin
+    registry (the standalone-skills path), where the copied skills really are
+    the ones this CLI shipped with.
+    """
+    version = _installed_plugin_version()
+    if version:
+        return version
     version_file = CLAUDE_PLUGINS_DIR / "tl-cli" / ".version"
     if version_file.exists():
         return version_file.read_text().strip()
     return None
+
+
+def _write_version_stamp(version: str) -> None:
+    """Record which plugin version is installed, for `check_plugin_version()`."""
+    version_dir = CLAUDE_PLUGINS_DIR / "tl-cli"
+    version_dir.mkdir(parents=True, exist_ok=True)
+    (version_dir / ".version").write_text(version)
+
+
+def _update_plugin(claude_bin: str) -> tuple[bool, bool, str]:
+    """Pull the installed plugin up to the marketplace's current version.
+
+    `plugin install` exits successfully without doing anything when the
+    plugin is already installed, so this is what actually advances an
+    existing install. Returns (ok, changed, output); `changed` is False when
+    the plugin was already at the latest version.
+    """
+    ok, output = _run_claude(["plugin", "update", PLUGIN_KEY], claude_bin)
+    changed = ok and "already at the latest" not in output.lower()
+    return ok, changed, output
 
 
 def check_plugin_version() -> list[str]:
@@ -176,11 +231,9 @@ def check_plugin_version() -> list[str]:
     warnings = []
 
     # Claude Code
-    claude_version_file = CLAUDE_PLUGINS_DIR / "tl-cli" / ".version"
-    if claude_version_file.exists():
-        installed = claude_version_file.read_text().strip()
-        if installed != __version__:
-            warnings.append(f"Claude Code plugin is outdated (v{installed} vs CLI v{__version__}). Run 'tl setup claude' to update.")
+    installed = _get_installed_plugin_version()
+    if installed and installed != __version__:
+        warnings.append(f"Claude Code plugin is outdated (v{installed} vs CLI v{__version__}). Run 'tl setup claude' to update.")
 
     # OpenCode
     opencode_version_file = OPENCODE_SKILLS_DIR / ".tl-version"
@@ -236,6 +289,7 @@ def _install_standalone_skills(plugin_root: Path) -> int:
                     shutil.rmtree(dst)
                 shutil.copytree(skill_dir, dst)
                 count += 1
+        _copy_shared_support(skills_src, CLAUDE_SKILLS_DIR)
 
     # Commands: commands/<name>.md → ~/.claude/commands/<name>.md
     commands_src = plugin_root / "commands"
@@ -247,6 +301,20 @@ def _install_standalone_skills(plugin_root: Path) -> int:
             count += 1
 
     return count
+
+
+def _copy_shared_support(skills_src: Path, target_dir: Path) -> None:
+    """Copy `skills/_shared/` (helper modules skills import across skill
+    directories) alongside the installed skills. It carries no SKILL.md, so
+    the skill loops skip it, but installed scripts resolve it relative to
+    their own path and fail without it."""
+    shared_src = skills_src / "_shared"
+    if not shared_src.is_dir():
+        return
+    dst = target_dir / "_shared"
+    if dst.exists():
+        shutil.rmtree(dst)
+    shutil.copytree(shared_src, dst)
 
 
 def _install_command_shim() -> Path:
@@ -368,9 +436,9 @@ def setup_claude(
 ) -> None:
     """Install the TL CLI plugin for Claude Code.
 
-    Registers the ThoughtLeaders marketplace, installs the tl-cli plugin,
-    and adds a /tl shim command so the plugin's tl skill can be invoked
-    without the plugin namespace. Standalone skill copies in ~/.claude/skills
+    Registers the ThoughtLeaders marketplace, installs and updates the
+    tl-cli plugin, and adds a /tl shim command so the plugin's tl skill can
+    be invoked without the plugin namespace. Standalone skill copies in ~/.claude/skills
     are only installed as a fallback when the plugin can't be installed;
     unmodified copies left by earlier versions are removed.
 
@@ -445,7 +513,23 @@ def setup_claude(
             _print_manual_instructions()
             raise SystemExit(1)
 
-    # Step 3: /tl shim command + cleanup of standalone copies from older versions
+    # Step 3: Update the plugin. An install that found the plugin already
+    # present did nothing, so without this an existing install stays pinned
+    # at whatever version it was first installed at.
+    console.print("[bold]Updating plugin...[/bold]")
+    ok, changed, output = _update_plugin(claude_bin)
+    installed_version = _installed_plugin_version()
+    version_label = f"v{installed_version}" if installed_version else "version unknown"
+    if not ok:
+        console.print(f"  [yellow]![/yellow] Plugin update failed: {output}")
+        console.print(f"    Continuing with the installed plugin ({version_label}).")
+    elif changed:
+        console.print(f"  [green]✓[/green] Plugin updated to {version_label}")
+        console.print("    [yellow]Restart Claude Code to apply the new version.[/yellow]")
+    else:
+        console.print(f"  [green]✓[/green] Plugin already up to date ({version_label})")
+
+    # Step 4: /tl shim command + cleanup of standalone copies from older versions
     console.print("[bold]Installing /tl shortcut...[/bold]")
     shim = _install_command_shim()
     console.print(f"  [green]✓[/green] /tl command installed: {shim}")
@@ -456,10 +540,7 @@ def setup_claude(
         console.print(f"  [yellow]![/yellow] Kept {kept} modified standalone skill(s) in {CLAUDE_SKILLS_DIR}")
         console.print("    These differ from the plugin's versions and shadow nothing — remove manually if unwanted.")
 
-    # Write version stamp
-    version_dir = CLAUDE_PLUGINS_DIR / "tl-cli"
-    version_dir.mkdir(parents=True, exist_ok=True)
-    (version_dir / ".version").write_text(__version__)
+    _write_version_stamp(installed_version or __version__)
 
     console.print()
     console.print("[green]Setup complete![/green]")
@@ -523,6 +604,14 @@ def _setup_noninteractive(fmt: str = "json") -> None:
 
         ok, output = _run_claude(["plugin", "install", PLUGIN_KEY], claude_bin)
         result["plugin_installed"] = ok or "already" in output.lower()
+
+        # `install` is a no-op on an already-installed plugin — this is what
+        # advances it to the marketplace's current version.
+        if result["plugin_installed"]:
+            ok, changed, output = _update_plugin(claude_bin)
+            result["plugin_updated"] = changed
+            if not ok:
+                result["plugin_update_error"] = output
     else:
         result["marketplace_registered"] = False
         result["plugin_installed"] = False
@@ -541,10 +630,11 @@ def _setup_noninteractive(fmt: str = "json") -> None:
         result["command_shim_installed"] = False
         result["standalone_skills_installed"] = _install_standalone_skills(plugin_root)
 
-    # Write version stamp
-    version_dir = CLAUDE_PLUGINS_DIR / "tl-cli"
-    version_dir.mkdir(parents=True, exist_ok=True)
-    (version_dir / ".version").write_text(__version__)
+    # Stamp what is actually installed. The standalone fallback copied this
+    # CLI's own bundled skills, so there __version__ is the honest answer.
+    installed_version = _installed_plugin_version() if result["plugin_installed"] else None
+    result["plugin_version"] = installed_version
+    _write_version_stamp(installed_version or __version__)
 
     result["status"] = "ok"
     _emit_setup_result(result, fmt)
@@ -578,6 +668,7 @@ def _install_skill_trees(plugin_root: Path, target_dir: Path) -> int:
                     shutil.rmtree(dst)
                 shutil.copytree(skill_dir, dst)
                 count += 1
+        _copy_shared_support(skills_src, target_dir)
     if count > 0 or target_dir.exists():
         target_dir.mkdir(parents=True, exist_ok=True)
         (target_dir / ".tl-version").write_text(__version__)
@@ -756,3 +847,74 @@ def setup_codex(
         json_output=json_output,
         toon_output=toon_output,
     )
+
+
+def _prepend_user_path(new_dir: str) -> bool:
+    """Prepend ``new_dir`` to the persistent per-user PATH.
+
+    Writes HKCU\\Environment and broadcasts the change so new processes pick it
+    up without a sign-out. Returns True if PATH was changed, False if new_dir
+    was already present. Windows-only.
+    """
+    import ctypes
+    import winreg
+
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
+        try:
+            current, _ = winreg.QueryValueEx(key, "Path")
+        except FileNotFoundError:
+            current = ""
+        parts = [p for p in current.split(os.pathsep) if p]
+        target = os.path.normcase(os.path.normpath(new_dir))
+        if any(os.path.normcase(os.path.normpath(p)) == target for p in parts):
+            return False
+        updated = os.pathsep.join([new_dir, *parts]) if parts else new_dir
+        winreg.SetValueEx(key, "Path", 0, winreg.REG_EXPAND_SZ, updated)
+
+    # Tell running shells the environment changed (best-effort).
+    ctypes.windll.user32.SendMessageTimeoutW(0xFFFF, 0x1A, 0, "Environment", 0x2, 5000, None)
+    return True
+
+
+@app.command("windows")
+def setup_windows(
+    force: bool = typer.Option(False, "--force", help="Overwrite an existing tl.cmd wrapper"),
+) -> None:
+    """Make `tl` runnable under Windows Smart App Control (Windows only).
+
+    pipx/uv expose `tl` through an *unsigned* launcher stub that Smart App
+    Control (and enforced WDAC policies) block. This writes a small `tl.cmd`
+    that runs the CLI through the already-signed `python.exe` instead, and
+    puts it ahead of the blocked stub on your PATH.
+
+    Run once. On a machine where `tl` is already blocked, bootstrap it with
+    the venv's signed python directly:
+
+        <pipx-venv>\\Scripts\\python.exe -m tl_cli setup windows
+
+    Examples:
+        tl setup windows
+    """
+    if sys.platform != "win32":
+        console.print("[yellow]`tl setup windows` only applies on Windows — nothing to do here.[/yellow]")
+        return
+
+    python_exe = Path(sys.executable)
+    wrapper_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Programs" / "tl-cli"
+    wrapper = wrapper_dir / "tl.cmd"
+
+    if wrapper.exists() and not force:
+        console.print(f"[yellow]Wrapper already exists:[/yellow] {wrapper}\nRe-run with --force to regenerate it.")
+        return
+
+    wrapper_dir.mkdir(parents=True, exist_ok=True)
+    # Absolute path to the signed interpreter bypasses PATH so the launch can't
+    # resolve back to the blocked stub. %* forwards all arguments unchanged.
+    wrapper.write_text(f'@echo off\r\n"{python_exe}" -m tl_cli %*\r\n', encoding="ascii", newline="")
+
+    console.print(f"[green]✓[/green] Wrote signed-launcher wrapper: {wrapper}")
+    if _prepend_user_path(str(wrapper_dir)):
+        console.print(f"[green]✓[/green] Added to your user PATH (ahead of the blocked stub): {wrapper_dir}")
+    else:
+        console.print(f"[dim]Already on your user PATH: {wrapper_dir}[/dim]")
+    console.print("[dim]Open a new terminal, then run:[/dim] tl whoami")

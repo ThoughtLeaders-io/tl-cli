@@ -64,6 +64,25 @@ uv tool install thoughtleaders-cli
 pip install thoughtleaders-cli
 ```
 
+#### Windows with Smart App Control / WDAC
+
+The pipx/uv install above creates an **unsigned** launcher stub that Windows
+Smart App Control (and enforced WDAC policies) block — `tl` fails to start with
+a Code Integrity error. Fix it with:
+
+```powershell
+tl setup windows
+```
+
+That drops a small `tl.cmd` on your `PATH` (ahead of the blocked stub) which
+launches the CLI through the already-signed `python.exe`, so it runs cleanly
+under SAC. If `tl` is *already* blocked and won't start, bootstrap it through
+the signed interpreter directly, then reopen your terminal:
+
+```powershell
+& "$env:USERPROFILE\pipx\venvs\thoughtleaders-cli\Scripts\python.exe" -m tl_cli setup windows
+```
+
 Then set up:
 ```bash
 tl auth login          # authenticate with ThoughtLeaders (OAuth2 browser flow, device code, or API key)

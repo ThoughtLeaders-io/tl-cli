@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "thoughtleaders-cli"
-version = "0.9.8"
+version = "0.9.13"
 description = "ThoughtLeaders CLI — query sponsorship data, channels, brands, and intelligence"
 readme = "README.md"
 license = "MIT"

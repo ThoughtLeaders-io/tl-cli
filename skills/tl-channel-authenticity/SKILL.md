@@ -26,16 +26,17 @@ investigations.
   view-curves can be hand-waved ("the algorithm", "we ran ads"); reading what
   the audience actually says is the only direct proof. A run without it is
   invalid.
-- **Data access is CLI-only.** Everything goes through `tl_cli.py` and the
-  `tl` CLI (`tl db pg/fb/es`, `tl channels similar`).
+- **Data access is CLI-only.** Everything goes through the shared wrapper
+  (`skills/_shared/tl_data.py`) and the `tl` CLI (`tl db pg/fb/es`,
+  `tl channels similar`); channel resolution lives in
+  `scripts/channel_lookup.py`.
 - Do all data processing with the "utf-8" encoding explicitly in all scripts
   you create.
 
 ## Setup check
 
 ```bash
-cd .claude/skills/tl-channel-authenticity/scripts
-python3 tl_cli.py preflight        # must print "OK"
+python3 .claude/skills/_shared/tl_data.py preflight   # must print "OK"
 ```
 If this errors with `cli_unavailable`, tell the user to run `tl auth login`
 (or set `TL_API_KEY`). Comment scraping additionally needs `yt-dlp`

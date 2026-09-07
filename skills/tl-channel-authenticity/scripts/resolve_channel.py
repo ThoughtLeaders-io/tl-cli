@@ -21,7 +21,12 @@ import sys
 
 import _io_utf8  # noqa: F401  (side effect: forces UTF-8 stdout/stderr on Windows)
 
-import tl_cli
+import pathlib as _pathlib
+import sys as _sys
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parents[2] / "_shared"))
+import tl_data
+
+import channel_lookup
 
 VIDEO_FETCH = 30  # how many recent of each content_type to pull
 
@@ -51,10 +56,8 @@ def _es_recent(channel_id: int, content_type: str, size: int) -> list[dict]:
         },
         "sort": [{"publication_date": {"order": "desc"}}],
     }
-    res = tl_cli.db_es(body)
     out = []
-    for h in res.get("hits", {}).get("hits", []):
-        s = h.get("_source", h)
+    for s in tl_data.db_es(body):
         vid = str(s.get("id", ""))
         out.append(
             {
@@ -74,7 +77,7 @@ def _es_recent(channel_id: int, content_type: str, size: int) -> list[dict]:
 
 
 def _resolve_adlink(adlink_id: int) -> tuple[dict, dict]:
-    rows = tl_cli.db_pg(
+    rows = tl_data.db_pg(
         "SELECT a.id, a.publish_status, a.publish_date, a.scheduled_date, "
         "a.price, a.cost, a.article_id, a.url, s.channel_id "
         "FROM thoughtleaders_adlink a "
@@ -82,7 +85,7 @@ def _resolve_adlink(adlink_id: int) -> tuple[dict, dict]:
         f"WHERE a.id = {int(adlink_id)} LIMIT 1"
     )
     if not rows:
-        raise tl_cli.DataError(f"adlink {adlink_id} not found")
+        raise tl_data.DataError(f"adlink {adlink_id} not found")
     adlink = rows[0]
     article_id = adlink.get("article_id") or ""
     video_id = article_id.split(":", 1)[1] if ":" in article_id else article_id
@@ -99,9 +102,9 @@ def resolve(ref: str) -> dict:
         adlink_id = int(ref.split(":", 1)[1])
         focus_adlink, ch_hint = _resolve_adlink(adlink_id)
         focus_video_id = focus_adlink.get("video_id")
-        channel = tl_cli.channels_show(ch_hint["id"])
+        channel = channel_lookup.channels_show(ch_hint["id"])
     else:
-        channel = tl_cli.channels_show(ref)
+        channel = channel_lookup.channels_show(ref)
 
     cid = int(channel["id"])
     longform = _es_recent(cid, "longform", VIDEO_FETCH)

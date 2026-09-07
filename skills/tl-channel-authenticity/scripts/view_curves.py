@@ -2,7 +2,7 @@
 """Minimal view-curve loader + interpolation for sparse view snapshots.
 
 Self-contained gap-filling logic (linear + log interpolation, first deltas).
-Pulls per-video view/like/comment snapshots via tl_cli.db_fb.
+Pulls per-video view/like/comment snapshots via tl_data.db_fb.
 
 Snapshots are sparse — older videos are sampled less often — so to compare
 "views at age N" we interpolate between the surrounding snapshots:
@@ -17,7 +17,10 @@ from dataclasses import dataclass
 
 import _io_utf8  # noqa: F401  (side effect: forces UTF-8 stdout/stderr on Windows)
 
-import tl_cli
+import pathlib as _pathlib
+import sys as _sys
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parents[2] / "_shared"))
+import tl_data
 
 
 @dataclass
@@ -29,7 +32,7 @@ class Snap:
 
 
 def load_curve(channel_id: int, video_id: str) -> list[Snap]:
-    rows = tl_cli.db_fb(
+    rows = tl_data.db_fb(
         "SELECT age, view_count, like_count, comment_count "
         "FROM article_metrics "
         f"WHERE channel_id = {int(channel_id)} AND id = '{video_id}' "

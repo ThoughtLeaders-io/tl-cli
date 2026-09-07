@@ -17,7 +17,7 @@ Phase 2 (finalize):
 
 `<ref>` = handle/@handle/URL/channel name/numeric id, or `adlink:<id>`.
 
-Data access is entirely via tl_cli (the `tl` CLI). No database credentials
+Data access is entirely via the shared tl_data wrapper (the `tl` CLI). No database credentials
 are used.
 """
 from __future__ import annotations
@@ -36,13 +36,18 @@ import resolve_channel
 import score as score_mod
 import video_integrity
 
-import tl_cli
+import pathlib as _pathlib
+import sys as _sys
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parents[2] / "_shared"))
+import tl_data
+
+import channel_lookup
 
 OUT_DIR = Path("/tmp")
 
 
 def collect(ref: str) -> dict:
-    tl_cli.preflight()
+    tl_data.preflight()
     data = resolve_channel.resolve(ref)
     ch = data["channel"]
     cid = int(ch["id"])
@@ -155,7 +160,7 @@ def main() -> None:
         else:
             ap.print_help()
             sys.exit(2)
-    except tl_cli.AmbiguousChannel as exc:
+    except channel_lookup.AmbiguousChannel as exc:
         print(
             json.dumps(
                 {
@@ -180,7 +185,7 @@ def main() -> None:
             )
         )
         sys.exit(4)
-    except tl_cli.CliUnavailable as exc:
+    except tl_data.CliUnavailable as exc:
         print(
             json.dumps(
                 {

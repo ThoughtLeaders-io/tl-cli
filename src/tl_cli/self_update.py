@@ -426,7 +426,11 @@ def _resync_integrations() -> None:
             subprocess.run(
                 [tl_bin, "setup", tool, "--json"],
                 capture_output=True,
-                timeout=120,
+                # The Claude Code path shells out to `claude` several times
+                # (marketplace add + update, plugin install + update), each
+                # with its own timeout — a 120s budget for the whole resync
+                # can expire mid-sequence on a slow network.
+                timeout=300,
                 check=False,
             )
         except (OSError, subprocess.TimeoutExpired):

@@ -362,18 +362,6 @@
       "uniqueItems": true,
       "description": "Article IDs to exclude (composite `<channel_id>:<youtube_id>` form). Pairs with a predicate-style FilterSet — useful for 'videos matching X, except these specific ones'.",
       "_tl_django_m2m": "FilterSet.exclude_articles via FiltersetExcludeArticles"
-    },
-
-    "networks": {
-      "type": ["array", "null"],
-      "items": { "type": "integer", "minimum": 1 },
-      "uniqueItems": true,
-      "_tl_django_m2m": "FilterSet.networks → thoughtleaders.Publication"
-    },
-    "exclude_networks": {
-      "type": ["array", "null"],
-      "items": { "type": "integer", "minimum": 1 },
-      "uniqueItems": true
     }
   },
 

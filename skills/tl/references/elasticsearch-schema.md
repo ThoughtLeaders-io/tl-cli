@@ -59,7 +59,7 @@ Filter with `{"term": {"doc_type": "article"}}`. Coverage percentages are live `
 | `content_type` | keyword | `longform` / `short` / `live` — the complete value set. ~71% of docs; older docs have none (missing ≠ longform). Podcast/RSS docs have no `content_type`. |
 | `content_aspects` | keyword | Flags: `podcast`, `paid_promotion`, `unlisted` — the complete value set. Only ~2.6% of docs carry any. |
 | `hashtags` | keyword | Hashtags from the video description, stored **without the leading `#`** and lowercase (e.g. `marchmadness`); non-Latin tags appear percent-encoded (`%D0%B0…`) (~32%) |
-| `channel` | object | Embedded channel subset: `channel.id`, `channel.content_category`, `channel.format`, `channel.publication_id`, `channel.country`, `channel.language` — no text fields, no metrics. This is where a video's language/country/format/category live (top-level `language`, `country`, `format`, `content_category` exist only on channel docs). |
+| `channel` | object | Embedded channel subset: `channel.id`, `channel.content_category`, `channel.format`, `channel.country`, `channel.language` — no text fields, no metrics. This is where a video's language/country/format/category live (top-level `language`, `country`, `format`, `content_category` exist only on channel docs). |
 
 ⚠️ **Channel-doc fields that look like video fields but match 0 video docs:** `total_views`, `engagement`, `duration_live`/`duration_longform`/`duration_shorts`, `language`, `country`, `format`, `content_category`, `face_on_screen`. They live on channel docs (see below); on video docs use the embedded `channel.*` subset where available.
 
@@ -67,7 +67,7 @@ Filter with `{"term": {"doc_type": "article"}}`. Coverage percentages are live `
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `brand_mentions` | nested | Detected brand-mention objects (`id`, `type` organic/sponsored, `field`, `snippet`, `start_ts`/`end_ts`, `position`, `probability`, `detection_tool`) (~12%). Being `nested`, it must be queried with a `nested` query — a plain `{"exists": {"field": "brand_mentions"}}` matches 0 docs. |
+| `brand_mentions` | nested | Detected brand-mention objects (`id`, `type` organic/sponsored, `field`, `snippet`, `start_ts`/`end_ts`, `position`, `probability`, `detection_tool`) (~12%). Being `nested`, it must be queried with a `nested` query — a plain `{"exists": {"field": "brand_mentions"}}` matches 0 docs. Reading the results: the returned list holds ALL of the doc's mentions, not just the ones your nested query matched — re-check `id`/`type`/`field` on every element. `field` values are `summary` (the creator-written upload description), `transcript`, `title`, and rarely `content`: a `summary` hit is the affiliate link in the description, not speech; a `(0,0)` `start_ts`/`end_ts` span is a detection with no position, never evidence about where in the video the mention sits. |
 | `all_brand_mentions` | keyword | Brand IDs with any mention — the union of sponsored + organic (~12%) |
 | `sponsored_brand_mentions` | keyword | Brand IDs with a sponsored mention |
 | `organic_brand_mentions` | keyword | Brand IDs with an organic mention |
@@ -108,7 +108,8 @@ Contains a denormalized subset of the PostgreSQL channel data.
 | `media_selling_network_join_date` | date | MSN join date; non-null = MSN member (~1%) |
 | `has_outreach_email` | boolean | Has contact email (100%) |
 | `outreach_email` | text | Contact email (~45%) |
-| `social_links` | text | Flat array of the channel's profile URLs (~47%), e.g. `["https://twitter.com/…", "https://instagram.com/…", "https://discord.gg/…"]`. Source is a per-platform map plus a catch-all `_other` map for unrecognized platforms; in ES all of it is flattened into this one URL array (the `_other` URLs are folded in, the platform names are dropped). Occasional stray entries (bare emails, nested arrays) exist. |
+| `social_links` | text | Flat array of the channel's known profile links as **canonical keys** — lowercase `host/path` with no scheme, no `www.`, no query string, and `x.com` spelled as `twitter.com`, e.g. `["twitter.com/mrbeast", "instagram.com/mrbeast", "linktr.ee/foo"]` (~47%, growing). Sourced from the `all_social_links` accumulator (About-page scrapes plus web-search discoveries); platform names are dropped, e-mails never appear. |
+| `social_links.canonical` | text | Subfield of the above with a path-segment analyzer: one token per URL segment, subdomain-insensitive host. `{"match_phrase": {"social_links.canonical": "twitch.tv/ludwig"}}` is the precise way to ask "which channels carry exactly this profile link" — it matches `m.twitch.tv/ludwig` and deep paths under the profile, but never a channel that merely mentions the same words in different links. Prefer it over matching the parent field when the query is a `domain/handle` pair. |
 | `male_share` | byte | Male audience % — only ~1.6% of channel docs have demographic data |
 | `usa_share` | byte | US audience % — same ~1.6% coverage |
 | `device` | object | Audience device demographics where known: `device.primary` (most common device) and `device.share` (per-device % map). Very sparse (~0.2%). |
@@ -282,5 +283,4 @@ The `transcript` field's `_source` is **YouTube timed-text caption XML**, not pl
 - `sponsored_brand_mentions` and `organic_brand_mentions` are keyword arrays — use `term` queries.
 - For brand mention details (position, snippet, detection_tool), the data is in the `brand_mentions` nested field.
 - **Stored-only fields** — retrievable in `_source` but invisible to `exists`/`term`/`match` (queries on them silently match 0 docs): `url`, `image_url`, `es_index_tag`, `not_sponsored_by`.
-- **`publication_id` is deprecated** — don't use for joins.
 - No write access. The CLI only exposes `_search` against `tl-platform-*`.

@@ -17,7 +17,12 @@ from pathlib import Path
 
 import _io_utf8  # noqa: F401  (side effect: forces UTF-8 stdout/stderr on Windows)
 
-import tl_cli
+import pathlib as _pathlib
+import sys as _sys
+_sys.path.insert(0, str(_pathlib.Path(__file__).resolve().parents[2] / "_shared"))
+import tl_data
+
+import channel_lookup
 
 CACHE = Path(__file__).resolve().parent.parent / "references" / "peer-cohort-cache.json"
 CACHE_TTL_DAYS = 30
@@ -61,8 +66,8 @@ def _save_cache(cache: dict) -> None:
 
 def _peer_ids_via_cli(channel_id: int) -> list[int]:
     try:
-        rows = tl_cli.channels_similar(channel_id, limit=MAX_PEERS * 2)
-    except (tl_cli.DataError, tl_cli.CliUnavailable):
+        rows = channel_lookup.channels_similar(channel_id, limit=MAX_PEERS * 2)
+    except (tl_data.DataError, tl_data.CliUnavailable):
         return []
     ids = []
     for r in rows:
@@ -75,7 +80,7 @@ def _peer_ids_via_cli(channel_id: int) -> list[int]:
 def _peer_ids_via_pg(channel: dict) -> list[int]:
     reach = channel.get("subscribers") or 0
     lo, hi = int(reach * 0.5), int(reach * 1.5) or 10_000
-    rows = tl_cli.db_pg(
+    rows = tl_data.db_pg(
         "SELECT id FROM thoughtleaders_channel "
         f"WHERE content_category = {int(channel['content_category'])} "
         f"AND language = '{channel.get('language', 'en')}' "
@@ -103,8 +108,7 @@ def _peer_longform_rates(channel_id: int) -> dict | None:
         },
         "sort": [{"publication_date": {"order": "desc"}}],
     }
-    res = tl_cli.db_es(body)
-    hits = [h.get("_source", h) for h in res.get("hits", {}).get("hits", [])]
+    hits = tl_data.db_es(body)
     v = sum(h.get("views") or 0 for h in hits)
     if v < 5000 or len(hits) < 3:
         return None

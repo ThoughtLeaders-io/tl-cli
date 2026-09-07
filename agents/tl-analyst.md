@@ -1,6 +1,7 @@
 ---
 name: tl-analyst
 description: Use when the user asks to analyze, compare, investigate, or summarize ThoughtLeaders data across multiple dimensions. Chains tl CLI commands to answer complex questions that require multiple queries, cross-referencing, or aggregation. Triggers on "analyze", "compare", "investigate", "deep dive", "cross-reference", "trend", "correlation".
+model: sonnet
 tools: [Bash, Read]
 ---
 

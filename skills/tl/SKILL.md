@@ -88,11 +88,11 @@ Other key concepts:
 - **Adspots** — types of ads a channel is willing to publish (e.g. mention, dedicated video, product placement). Returned by `tl channels show`; each carries price/cost.
 - **Profiles** — actors that own sponsorship records on behalf of either side of a deal. A profile is either buyer-side or seller-side:
   - *Buyer-side (brand) profiles* — represent a sponsoring brand. Each brand profile has an M2M link to at most one `Brand` record (which are the actual advertiser identities). On a sponsorship, `advertiser_profile` is the buyer-side profile, and `advertiser_id` is the buyer-side user who created the record — the advertiser is always the buyer/brand side, never the YouTube creator (the channel hangs off `ad_spot_id`).
-  - *Seller-side (publisher) profiles* — attached to a `Publication`, which in turn owns one or more `Channel` records. A channel's adspots therefore inherit ownership through `channel.publication.profile`.
+  - *Seller-side (publisher) profiles* — represent one or more `Channel` records through the `thoughtleaders_profile_channels` link. Representation is not deal ownership: each adspot names its own seller (`ad_spot.publisher`, a user), so a channel's deals belong to whoever sold them, not to everyone who represents the channel.
   - **How to tell them apart** — three signals on the `thoughtleaders_profile` row, used in this order:
     1. **`persona`** (canonical) — `1=Brand`, `4=Media Agency`, `3=Talent Manager` are buyer-side; `2=Creator`, `5=Creator Service` are seller-side. May be null on legacy rows.
     2. **`is_advertiser` / `is_publisher`** booleans — feature flags; either or both can be true for staff-style profiles, but on normal user profiles they reliably mark side.
-  - Org scoping for sponsorships is profile-mediated: a sponsorship belongs to your org if **either** `advertiser_profile.organization` (brand side) **or** `ad_spot.channel.publication.profile.organization` (publisher side) matches yours.
+  - Org scoping for sponsorships is profile-mediated: a sponsorship belongs to your org if **either** `advertiser_profile.organization` (brand side) **or** the adspot seller's organization — `ad_spot.publisher` → that user's profile → `organization` (publisher side) — matches yours. Representing the channel does not surface its deals.
 - **MSN** (Media Selling Network) — the ~12k YouTube channels that have opted in to receive sponsorship offers. A channels is in the MSN group if the `channel.media_selling_network_join_date` field is not null.
 - **MBN** (Media Buying Network) — the brand-side counterpart to MSN: brand profiles that have opted in to receive proposed sponsorships. A profile is in the MBN group if the `profile.media_buying_network_join_date` field is not null.
 - **TPP** (ThoughtLeaders Partner Program, a.k.a. "TL channels") — the ~170 channels TL has the closest working relationship with. A channel is in the TPP group if `channel.is_tpp` is True. **Prefer TPP channels when booking**: they respond fastest, are the easiest to close, and don't need an outreach round-trip — treat them as immediately bookable. TPP is a strict subset of MSN, so the same booking rules (one active mention adspot, etc.) apply.
@@ -521,7 +521,6 @@ If unsure about what information to find where, read the [references/postgresql-
 - `Postgres channel.id` ↔ `ES channel.id` (on article docs) ↔ `Firebolt article_metrics.channel_id` / `channel_metrics.id`
 - `Postgres adlink.article_id` is `<channel_id>:<youtube_id>` — same as ES `_id`. Strip the prefix to get `Firebolt article_metrics.id`.
 - `Postgres brand.id` ↔ ES `sponsored_brand_mentions[]` / `organic_brand_mentions[]`.
-- `publication_id` is **deprecated** — don't use it.
 
 **Snapshots are sparse**, especially for older videos. Don't assume two arbitrary dates have data points. For approximations, prefer `tl snapshots` which already implements the project's interpolation logic; falling back to raw `tl db fb` means you handle gaps yourself.
 

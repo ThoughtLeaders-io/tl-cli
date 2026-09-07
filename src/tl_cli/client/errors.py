@@ -92,7 +92,9 @@ def handle_api_error(error: ApiError) -> None:
         err.print(f"[red]Access denied:[/red] {detail}")
         _print_hint(hint)
         _print_debug(error)
-        sys.exit(1)
+        # Exit 5 is the machine-readable "access denied" signal (plan gates,
+        # permission errors) — scripts branch on it instead of parsing stderr.
+        sys.exit(5)
     elif error.status_code == 404:
         err.print(f"[yellow]Not found:[/yellow] {detail}")
         _print_hint(hint)
